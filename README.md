@@ -7,7 +7,7 @@
 ```
 .
 ├── cmd/
-│   └── console/           # 主程序入口
+│   └── manater/           # 主程序入口
 ├── internal/
 │   ├── handler/           # HTTP处理器
 │   ├── service/           # 业务逻辑层
@@ -60,7 +60,7 @@ go mod download
 ### 运行服务
 
 ```bash
-go run cmd/console/main.go
+go run cmd/manager/main.go
 ```
 
 服务将在 http://localhost:8080 启动
