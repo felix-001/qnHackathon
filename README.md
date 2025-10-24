@@ -94,6 +94,8 @@ go run cmd/console/main.go
 3. **数据模型层**: 定义核心数据结构
 4. **Web展示层**: HTML模板实现控制台页面
 
+![智能发布系统架构图](doc/智能发布系统.drawio.png)
+
 ## 开发计划
 
 - [ ] 数据持久化（MySQL/PostgreSQL）
