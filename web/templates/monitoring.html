@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>监控面板 - 智能发布控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
+        .header { background: #001529; color: white; padding: 0 24px; height: 64px; display: flex; align-items: center; font-size: 20px; font-weight: bold; }
+        .container { display: flex; min-height: calc(100vh - 64px); }
+        .sidebar { width: 200px; background: #f0f2f5; padding: 16px 0; }
+        .menu-item { padding: 12px 24px; cursor: pointer; color: #333; text-decoration: none; display: block; }
+        .menu-item:hover { background: #e6f7ff; }
+        .menu-item.active { background: #1890ff; color: white; }
+        .content { flex: 1; padding: 24px; background: #fff; margin: 24px; }
+        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
+        .metric-card { padding: 24px; background: #fafafa; border-radius: 8px; }
+        .metric-value { font-size: 32px; font-weight: bold; color: #1890ff; }
+        .metric-title { color: #666; margin-bottom: 8px; }
+        select { padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">智能发布控制台</div>
+    <div class="container">
+        <div class="sidebar">
+            <a href="/projects" class="menu-item">项目管理</a>
+            <a href="/releases" class="menu-item">发布管理</a>
+            <a href="/monitoring" class="menu-item active">监控面板</a>
+            <a href="/config" class="menu-item">配置管理</a>
+        </div>
+        <div class="content">
+            <select id="releaseSelect" onchange="loadMetrics()">
+                <option value="">选择发布任务</option>
+                <option value="release-1">Release v1.0.0</option>
+                <option value="release-2">Release v1.1.0</option>
+            </select>
+
+            <div class="metrics">
+                <div class="metric-card">
+                    <div class="metric-title">请求速率 (req/s)</div>
+                    <div class="metric-value" id="requestRate">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">错误率 (%)</div>
+                    <div class="metric-value" id="errorRate">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">P50 延迟 (ms)</div>
+                    <div class="metric-value" id="latencyP50">--</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-title">P99 延迟 (ms)</div>
+                    <div class="metric-value" id="latencyP99">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function loadMetrics() {
+            const releaseId = document.getElementById('releaseSelect').value;
+            if (!releaseId) return;
+
+            fetch(`/api/v1/monitoring/realtime?releaseId=${releaseId}`)
+                .then(res => res.json())
+                .then(data => {
+                    const metrics = data.data.metrics;
+                    document.getElementById('requestRate').textContent = metrics.requestRate.toFixed(0);
+                    document.getElementById('errorRate').textContent = (metrics.errorRate * 100).toFixed(3);
+                    document.getElementById('latencyP50').textContent = metrics.latencyP50.toFixed(0);
+                    document.getElementById('latencyP99').textContent = metrics.latencyP99.toFixed(0);
+                });
+        }
+
+        setInterval(() => {
+            const releaseId = document.getElementById('releaseSelect').value;
+            if (releaseId) loadMetrics();
+        }, 5000);
+    </script>
+</body>
+</html>
