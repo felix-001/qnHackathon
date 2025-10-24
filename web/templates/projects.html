@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目管理 - 智能发布控制台</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
+        .header { background: #001529; color: white; padding: 0 24px; height: 64px; display: flex; align-items: center; font-size: 20px; font-weight: bold; }
+        .container { display: flex; min-height: calc(100vh - 64px); }
+        .sidebar { width: 200px; background: #f0f2f5; padding: 16px 0; }
+        .menu-item { padding: 12px 24px; cursor: pointer; color: #333; text-decoration: none; display: block; }
+        .menu-item:hover { background: #e6f7ff; }
+        .menu-item.active { background: #1890ff; color: white; }
+        .content { flex: 1; padding: 24px; background: #fff; margin: 24px; }
+        .btn { padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 16px; }
+        .btn:hover { background: #40a9ff; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+        th { background: #fafafa; font-weight: 600; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+        .modal-content { background: white; margin: 100px auto; padding: 24px; width: 500px; border-radius: 8px; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 4px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="header">智能发布控制台</div>
+    <div class="container">
+        <div class="sidebar">
+            <a href="/projects" class="menu-item active">项目管理</a>
+            <a href="/releases" class="menu-item">发布管理</a>
+            <a href="/monitoring" class="menu-item">监控面板</a>
+            <a href="/config" class="menu-item">配置管理</a>
+        </div>
+        <div class="content">
+            <button class="btn" onclick="showModal()">创建项目</button>
+            <table id="projectTable">
+                <thead>
+                    <tr>
+                        <th>项目名称</th>
+                        <th>项目代码</th>
+                        <th>负责人</th>
+                        <th>构建工具</th>
+                        <th>部署类型</th>
+                        <th>状态</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="projectList"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <h2>创建项目</h2>
+            <form id="projectForm">
+                <div class="form-group">
+                    <label>项目名称</label>
+                    <input type="text" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label>项目代码</label>
+                    <input type="text" name="code" required>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <textarea name="description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>负责人</label>
+                    <input type="text" name="owner" required>
+                </div>
+                <div class="form-group">
+                    <label>仓库地址</label>
+                    <input type="text" name="repositoryUrl">
+                </div>
+                <div class="form-group">
+                    <label>构建工具</label>
+                    <select name="buildTool">
+                        <option value="maven">Maven</option>
+                        <option value="gradle">Gradle</option>
+                        <option value="npm">NPM</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>部署类型</label>
+                    <select name="deploymentType">
+                        <option value="kubernetes">Kubernetes</option>
+                        <option value="docker">Docker</option>
+                        <option value="vm">VM</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn">提交</button>
+                <button type="button" class="btn" onclick="hideModal()">取消</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showModal() {
+            document.getElementById('modal').style.display = 'block';
+        }
+        function hideModal() {
+            document.getElementById('modal').style.display = 'none';
+        }
+        
+        function loadProjects() {
+            fetch('/api/v1/projects')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('projectList');
+                    tbody.innerHTML = data.data.map(p => `
+                        <tr>
+                            <td>${p.name}</td>
+                            <td>${p.code}</td>
+                            <td>${p.owner}</td>
+                            <td>${p.buildTool}</td>
+                            <td>${p.deploymentType}</td>
+                            <td>${p.status}</td>
+                            <td>
+                                <button onclick="deleteProject('${p.id}')">删除</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                });
+        }
+
+        document.getElementById('projectForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+            data.id = 'proj-' + Date.now();
+            
+            fetch('/api/v1/projects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            }).then(() => {
+                hideModal();
+                loadProjects();
+            });
+        });
+
+        function deleteProject(id) {
+            if (confirm('确定删除?')) {
+                fetch(`/api/v1/projects/${id}`, { method: 'DELETE' })
+                    .then(() => loadProjects());
+            }
+        }
+
+        loadProjects();
+    </script>
+</body>
+</html>
