@@ -1,13 +1,32 @@
 package main
 
 import (
+	"flag"
+	"log"
+
+	cfg "github.com/felix-001/qnHackathon/internal/config"
+
 	"github.com/felix-001/qnHackathon/internal/handler"
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	qconfig "github.com/qiniu/x/config"
+)
+
+var (
+	// configFile 配置文件
+	configFile = flag.String("f", "./config/manager.json", "the config file")
 )
 
 func main() {
+	flag.Parse()
+	cfg := &cfg.Config{}
+	err := qconfig.LoadFile(cfg, *configFile)
+	if err != nil {
+		log.Fatalf("加载配置文件失败: %v", err)
+	}
+	mgr := service.NewManager(cfg)
+	mgr.Run()
 	r := gin.Default()
 
 	r.Use(cors.Default())
@@ -44,5 +63,5 @@ func main() {
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
 	}
 
-	r.Run(":8080")
+	r.Run(":8081")
 }

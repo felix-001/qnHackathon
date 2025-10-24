@@ -1,0 +1,8 @@
+{
+	"jenkinsConf": {
+		"apitoken":"11446ecf7370d23c21b6a24fc64a1d4c98",
+		"username":"admin",
+		"url": "http://localhost:8080",
+		"projectID":"test"
+	}
+}
