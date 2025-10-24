@@ -7,7 +7,7 @@
 ```
 .
 ├── cmd/
-│   └── manater/           # 主程序入口
+│   └── manager/           # 主程序入口
 ├── internal/
 │   ├── handler/           # HTTP处理器
 │   ├── service/           # 业务逻辑层
