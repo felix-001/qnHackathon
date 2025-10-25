@@ -33,6 +33,10 @@
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
         .btn-edit { background: #52c41a; margin-right: 8px; }
         .btn-edit:hover { background: #73d13d; }
+        .btn-secondary { background: #595959; }
+        .btn-secondary:hover { background: #8c8c8c; }
+        .delete-mode { background: #ffe7ba; }
+        input[type="checkbox"] { cursor: pointer; }
     </style>
 </head>
 <body>
@@ -46,9 +50,14 @@
         </div>
         <div class="content">
             <button class="btn" onclick="showModal()">创建发布</button>
+            <button class="btn btn-secondary" id="toggleDeleteMode" onclick="toggleDeleteMode()">进入删除模式</button>
+            <button class="btn btn-danger" id="deleteSelected" onclick="deleteSelected()" style="display: none;">删除选中</button>
             <table>
                 <thead>
                     <tr>
+                        <th id="checkboxHeader" style="display: none; width: 50px;">
+                            <input type="checkbox" id="selectAll" onchange="selectAllReleases()">
+                        </th>
                         <th>项目名称</th>
                         <th>版本</th>
                         <th>环境</th>
@@ -117,6 +126,8 @@
     <script>
         let currentReleases = [];
         let editingReleaseId = null;
+        let deleteMode = false;
+        let selectedReleases = new Set();
 
         function showModal() {
             document.getElementById('modalTitle').textContent = '创建发布任务';
@@ -162,6 +173,9 @@
                     const tbody = document.getElementById('releaseList');
                     tbody.innerHTML = (data.data || []).map(r => `
                         <tr>
+                            <td style="display: ${deleteMode ? 'table-cell' : 'none'};">
+                                <input type="checkbox" class="release-checkbox" value="${r.id}" onchange="updateSelection('${r.id}')">
+                            </td>
                             <td>${r.projectId || '-'}</td>
                             <td>${r.version}</td>
                             <td>${r.environment}</td>
@@ -251,6 +265,92 @@
                     headers: { 'Content-Type': 'application/json' }
                 }).then(() => {
                     setTimeout(() => loadReleases(), 1000);
+                });
+            }
+        }
+
+        function toggleDeleteMode() {
+            deleteMode = !deleteMode;
+            selectedReleases.clear();
+            
+            const toggleBtn = document.getElementById('toggleDeleteMode');
+            const deleteBtn = document.getElementById('deleteSelected');
+            const checkboxHeader = document.getElementById('checkboxHeader');
+            const selectAllCheckbox = document.getElementById('selectAll');
+            
+            if (deleteMode) {
+                toggleBtn.textContent = '退出删除模式';
+                toggleBtn.classList.add('btn-secondary');
+                deleteBtn.style.display = 'inline-block';
+                checkboxHeader.style.display = 'table-cell';
+            } else {
+                toggleBtn.textContent = '进入删除模式';
+                toggleBtn.classList.remove('btn-secondary');
+                deleteBtn.style.display = 'none';
+                checkboxHeader.style.display = 'none';
+                selectAllCheckbox.checked = false;
+            }
+            
+            loadReleases();
+        }
+
+        function updateSelection(id) {
+            if (selectedReleases.has(id)) {
+                selectedReleases.delete(id);
+            } else {
+                selectedReleases.add(id);
+            }
+            
+            const deleteBtn = document.getElementById('deleteSelected');
+            deleteBtn.textContent = `删除选中 (${selectedReleases.size})`;
+            
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.release-checkbox');
+            selectAllCheckbox.checked = checkboxes.length > 0 && selectedReleases.size === checkboxes.length;
+        }
+
+        function selectAllReleases() {
+            const selectAllCheckbox = document.getElementById('selectAll');
+            const checkboxes = document.querySelectorAll('.release-checkbox');
+            
+            selectedReleases.clear();
+            checkboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+                if (selectAllCheckbox.checked) {
+                    selectedReleases.add(cb.value);
+                }
+            });
+            
+            const deleteBtn = document.getElementById('deleteSelected');
+            deleteBtn.textContent = `删除选中 (${selectedReleases.size})`;
+        }
+
+        function deleteSelected() {
+            if (selectedReleases.size === 0) {
+                alert('请至少选择一项');
+                return;
+            }
+            
+            const count = selectedReleases.size;
+            if (confirm(`确定删除选中的 ${count} 项发布任务?`)) {
+                const ids = Array.from(selectedReleases);
+                fetch('/api/v1/releases/batch-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 0) {
+                        selectedReleases.clear();
+                        loadReleases();
+                        alert('删除成功');
+                    } else {
+                        alert('删除失败: ' + data.message);
+                    }
+                })
+                .catch(err => {
+                    alert('删除失败: ' + err.message);
                 });
             }
         }

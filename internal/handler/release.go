@@ -158,3 +158,37 @@ func (h *ReleaseHandler) Deploy(c *gin.Context) {
 		Message: "success",
 	})
 }
+
+func (h *ReleaseHandler) BatchDelete(c *gin.Context) {
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    1,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    1,
+			Message: "ids cannot be empty",
+		})
+		return
+	}
+
+	if err := h.service.BatchDelete(req.IDs); err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    1,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    0,
+		Message: "success",
+	})
+}
