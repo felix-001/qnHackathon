@@ -89,14 +89,18 @@ sudo mkdir -p /var/run/bin-proxy
 {
   "binaries": [
     {
-      "name": "manager",
-      "version": "latest",
-      "currentSha256": ""
+      "serviceName": "manager",
+      "binaryName": "manager",
+      "version": "",
+      "previousVersion": "",
+      "port": 8080
     },
     {
-      "name": "your-service-name",
-      "version": "latest",
-      "currentSha256": ""
+      "serviceName": "your-service",
+      "binaryName": "your-service-name",
+      "version": "",
+      "previousVersion": "",
+      "port": 9090
     }
   ],
   "nodeInfo": {
