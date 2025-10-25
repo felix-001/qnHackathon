@@ -3,12 +3,12 @@
     {
       "name": "manager",
       "version": "latest",
-      "currentMd5": ""
+      "currentSha256": ""
     },
     {
       "name": "example-service",
       "version": "latest",
-      "currentMd5": ""
+      "currentSha256": ""
     }
   ],
   "nodeInfo": {

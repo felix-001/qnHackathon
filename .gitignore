@@ -1,5 +1,4 @@
-# 针对当前仓库设置（推荐）
-git config core.autocrlf false
-
-# 或者设置为 input（提交时转换为 LF，检出时不转换）
-git config core.autocrlf input
+.tmp-comment/
+*.backup
+*.backup.old
+*.lock
