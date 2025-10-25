@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 from flask import Flask, request, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 
 app = Flask(__name__)
 
@@ -47,7 +47,7 @@ def keepalive():
             "os_release": data.get("os_release", ""),
             "node_name": data.get("node_name", ""),
             "bin_proxy_version": data.get("bin_proxy_version", ""),
-            "last_seen": datetime.now(datetime.UTC).isoformat(),
+            "last_seen": datetime.now(timezone.utc).isoformat(),
         }
 
         return jsonify({"message": "node registered", "node": nodes[node_id]}), 201
@@ -83,7 +83,7 @@ def bins_handler(bin_name):
 
         node_bins[node_id][bin_name] = {
             "sha256sum": sha256sum,
-            "updated_at": datetime.now(datetime.UTC).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
         }
 
         return (
@@ -123,7 +123,7 @@ def bin_progress(bin_name):
         "targetHash": target_hash,
         "processingTime": processing_time,
         "status": status,
-        "updated_at": datetime.now(datetime.UTC).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     return (
