@@ -11,7 +11,7 @@
 		"projectID": "root/streamd"
 	},
 	"mongoConf": {
-		"url": "mongodb://localhost:27017",
+		"url": "mongodb://10.210.31.30:12345",
 		"database": "qnHackathon"
 	}
 }
