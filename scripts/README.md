@@ -1,24 +1,66 @@
-# bin-proxy
+# ansible-proxy
 
-bin-proxy 是一个用于自动维护和更新宿主机二进制文件的工具。
+> 为什么是 ansible-proxy?
+
+- 1.ansible 确实能满足自动化运维的需求：无论是 openstack 的 ansible 部署项目还是 kolla-ansible（容器化）部署项目，还是 kubespray，kubekey（k8s 集群部署项目），ansible 都能很好的满足单纯二进制和容器化的自动化运维需求。
+- 2.红帽已经推出了 ansible Light speed 新功能：利用 AI 生成 playbook，人工审批，直接执行。
+
+在每个集群中，运行一个 ansible proxy 服务，负责该集群内部所有服务的升级和回滚：无论是二进制形式运行的服务，还是容器化形式运行的服务。
+
+而 ansible-proxy 目前最佳项目是：<https://github.com/semaphoreui/semaphore>
+
+不仅可以调用 ansible，支持 Terraform/OpenTofu/Terragrunt, PowerShell and other DevOps tools.
+
+## 1. 架构
+
+一个集群一个 ansible-proxy，负责维护该集群中所有以二进制文件形式运行的服务：版本升级和回滚。
+设计上参考 ansible 和 k8s 的升级流程。
+ansible-proxy 兼容二进制和容器的场景：
+
+- 静态文件：二进制和容器镜像都是静态文件，二进制文件可以直接替换，容器镜像可以通过 docker pull 来更新。
+- 部署脚本：这里统一用 ansible playbook 来维护。ansible-proxy 不关心 playbook 细节，只负责自动调用 ansible-playbook 来执行升级和回滚任务。
+
+> 部署文件 = 静态文件 + 部署脚本
+
+部署文件采用统一的压缩格式： tar.gz
+
+一个集群一个 ansible-proxy：
+  > ansible-proxy 可以只监听在 keepalived vip 上，保证高可用，也可以单节点部署，毕竟不即使升级也没关系。该组件的需求重点在于满足自动升级和回滚。
+
+  ansible-proxy 依赖两份配置文件：
+
+  1. manifests： 该文件维护需要该集群的二进制服务列表：
+     服务名:
+     - 服务查询接口
+  2. inventory: ansible 的 inventory 文件
+      - 服务：是否部署
+      - 节点名
+      - 节点 ip
+      - 节点 cpu 架构： x86_64 / arm64 （考虑支持异构场景）
+      - 节点系统 release 版本
+  ansible-proxy 依赖的组件：
+    1. bin-manager api： 查询，领取，上报升级任务
+    2. nginx： 从 bin-manager 给的下载链接下载二进制文件，并缓存，供集群内节点下载使用
+    3. supervisor： 管理二进制服务的启动和重启：每个二进制服务都通过 supervisor 来管理，每个 app 都有独立的 supervisor 配置文件
+    4. ansible-playbook: ansible-proxy 通过 ansible-playbook 来执行升级|回滚任务
 
 ## 需求
 
-bin-proxy 功能实现：
+ansible-proxy 功能实现：
 
-bin-proxy 维护宿主机，以 shell 脚本实现，基于 crontab 每分钟执行一次
-bin-proxy 和 bin-manager api 交互：获取最新的 bin 二进制 sha256sum 值
-bin-proxy 基于一份 bin manifests 维护自己需要升级服务的二进制 bin 文件列表：叫做 bin-manifests
+ansible-proxy 维护宿主机，以 shell 脚本实现，基于 crontab 每分钟执行一次
+ansible-proxy 和 bin-manager api 交互：获取最新的 bin 二进制 sha256sum 值
+ansible-proxy 基于一份 bin manifests 维护自己需要升级服务的二进制 bin 文件列表：叫做 bin-manifests
 bin-manifests 包括：二进制 bin 名字，版本统一为 lastet，以及当前在运行的 bin sha256sum 值
-bin-proxy 会读取 bin-manifests，然后向 bin-manager api 查询最新版本的 sha256sum 值，如果不同则进行升级步骤
+ansible-proxy 会读取 bin-manifests，然后向 bin-manager api 查询最新版本的 sha256sum 值，如果不同则进行升级步骤
 版本变更步骤：替代本地 bin 文件，执行 supervisor 重启 bin 名字对应的服务
 
 bin-manager API
-/api/v1/keepalive： bin-proxy 使用该接口 get 自己的 node 信息，如果没有 post 上报自己的信息
+/api/v1/keepalive： ansible-proxy 使用该接口 get 自己的 node 信息，如果没有 post 上报自己的信息
 /api/v1/bins/: get 最新的 hash 值
 /api/v1/bins/: 升级后 post 自己最新的 hash 值，让 api 直到当前 node 使用的是最新的版本
 /api/v1/bins/{bin_name}/progress: node 上的 binproxy 上报当前任务的处理进度
-/api/v1/download: 各种 bin 的下载路径 wget /api/v1/download/ 即可下载，该路径可以独立：bin-proxy 支持修改
+/api/v1/download: 各种 bin 的下载路径 wget /api/v1/download/ 即可下载，该路径可以独立：ansible-proxy 支持修改
 
 bin-manifests 使用 yaml 格式，需要包含如下信息：
 各种服务的 bin 所有历史变更信息：
@@ -32,7 +74,7 @@ bin 名
 cpu 架构
 系统 release 版本
 node 名
-bin-proxy 的版本（同时维护到 bin-proxy 中）
+ansible-proxy 的版本（同时维护到 ansible-proxy 中）
 
 升级流程
 如果发现某个服务的 bin 文件的最新版本的 sha256sum 和当前 bin-manifests 中的 bin 不同，则执行升级
@@ -90,20 +132,20 @@ sudo yum install -y curl jq coreutils supervisor
 复制脚本到系统目录：
 
 ```bash
-sudo cp bin-proxy.sh /usr/local/sbin/
-sudo chmod +x /usr/local/sbin/bin-proxy.sh
+sudo cp ansible-proxy.sh /usr/local/sbin/
+sudo chmod +x /usr/local/sbin/ansible-proxy.sh
 ```
 
 创建配置目录并复制配置文件：
 
 ```bash
-sudo mkdir -p /etc/bin-proxy
-sudo cp bin-manifests.json /etc/bin-proxy/
+sudo mkdir -p /etc/ansible-proxy
+sudo cp bin-manifests.json /etc/ansible-proxy/
 ```
 
 ### 3. 配置环境变量
 
-创建配置文件 `/etc/bin-proxy/config`：
+创建配置文件 `/etc/ansible-proxy/config`：
 
 ```bash
 # bin-manager API 地址
@@ -113,13 +155,13 @@ export BIN_MANAGER_API="http://your-bin-manager-host:8080/api/v1"
 export BIN_DIR="/usr/local/bin"
 
 # manifests 文件路径
-export BIN_MANIFESTS="/etc/bin-proxy/bin-manifests.json"
+export BIN_MANIFESTS="/etc/ansible-proxy/bin-manifests.json"
 
 # 日志文件路径
-export LOG_FILE="/var/log/bin-proxy.log"
+export LOG_FILE="/var/log/ansible-proxy.log"
 
 # 锁文件目录
-export LOCK_DIR="/var/run/bin-proxy"
+export LOCK_DIR="/var/run/ansible-proxy"
 
 # 下载基础 URL（可选，默认使用 API 路径）
 export DOWNLOAD_BASE_URL="http://your-bin-manager-host:8080/api/v1/download"
@@ -128,12 +170,12 @@ export DOWNLOAD_BASE_URL="http://your-bin-manager-host:8080/api/v1/download"
 创建锁文件目录：
 
 ```bash
-sudo mkdir -p /var/run/bin-proxy
+sudo mkdir -p /var/run/ansible-proxy
 ```
 
 ### 4. 配置 bin-manifests.json
 
-编辑 `/etc/bin-proxy/bin-manifests.json`，添加需要管理的二进制文件：
+编辑 `/etc/ansible-proxy/bin-manifests.json`，添加需要管理的二进制文件：
 
 ```json
 {
@@ -175,8 +217,8 @@ sudo crontab -e
 添加以下内容：
 
 ```cron
-# bin-proxy: 每分钟检查并更新二进制文件
-* * * * * . /etc/bin-proxy/config && /usr/local/sbin/bin-proxy.sh
+# ansible-proxy: 每分钟检查并更新二进制文件
+* * * * * . /etc/ansible-proxy/config && /usr/local/sbin/ansible-proxy.sh
 ```
 
 ### 6. 配置 Supervisor（可选）
@@ -209,23 +251,23 @@ sudo supervisorctl update
 
 ```bash
 # 使用默认配置
-sudo /usr/local/sbin/bin-proxy.sh
+sudo /usr/local/sbin/ansible-proxy.sh
 
 # 使用自定义配置
 sudo BIN_MANAGER_API="http://custom-host:8080/api/v1" \
      BIN_MANIFESTS="/custom/path/bin-manifests.json" \
-     /usr/local/sbin/bin-proxy.sh
+     /usr/local/sbin/ansible-proxy.sh
 ```
 
 ### 查看日志
 
 ```bash
-sudo tail -f /var/log/bin-proxy.log
+sudo tail -f /var/log/ansible-proxy.log
 ```
 
 ## API 接口要求
 
-bin-proxy 需要 bin-manager 提供以下 API 接口：
+ansible-proxy 需要 bin-manager 提供以下 API 接口：
 
 ### 1. Keepalive 接口
 
@@ -359,7 +401,7 @@ Response: 二进制文件流
 ## 工作流程
 
 1. **初始化阶段**
-   - bin-proxy 每分钟通过 crontab 执行
+   - ansible-proxy 每分钟通过 crontab 执行
    - 创建锁文件目录
    - 更新 bin-manifests.json 中的节点信息
    - 向 API 发送 keepalive 请求（检查/注册节点）
@@ -408,7 +450,7 @@ Response: 二进制文件流
 ### 查看日志
 
 ```bash
-sudo tail -f /var/log/bin-proxy.log
+sudo tail -f /var/log/ansible-proxy.log
 ```
 
 ### 测试 API 连接
@@ -420,32 +462,32 @@ curl -s "http://your-bin-manager-host:8080/api/v1/releases/latest/manager/sha256
 ### 检查 crontab 是否运行
 
 ```bash
-sudo grep CRON /var/log/syslog | grep bin-proxy
+sudo grep CRON /var/log/syslog | grep ansible-proxy
 ```
 
 ### 验证文件权限
 
 ```bash
-ls -la /usr/local/sbin/bin-proxy.sh
-ls -la /etc/bin-proxy/
+ls -la /usr/local/sbin/ansible-proxy.sh
+ls -la /etc/ansible-proxy/
 ```
 
 ### 检查锁文件状态
 
 ```bash
-ls -la /var/run/bin-proxy/
+ls -la /var/run/ansible-proxy/
 ```
 
 查看锁文件内容（Unix 时间戳）：
 
 ```bash
-cat /var/run/bin-proxy/manager-abc123def456.lock
+cat /var/run/ansible-proxy/manager-abc123def456.lock
 ```
 
 手动清理锁文件（如果需要）：
 
 ```bash
-sudo rm /var/run/bin-proxy/*.lock
+sudo rm /var/run/ansible-proxy/*.lock
 ```
 
 ## 安全建议
