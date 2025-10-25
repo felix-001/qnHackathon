@@ -344,53 +344,63 @@ def download_binary(bin_name: str, temp_file: str) -> bool:
         return False
 
 
-def change_version(
-    bin_name: str, target_sha256: str, operation: str = "upgrade"
-) -> bool:
+def _validate_change_version_params(bin_name: str, target_sha256: str) -> bool:
     if not bin_name or not target_sha256:
         error("bin_name and target_sha256 are required for change_version")
         return False
+    return True
 
+
+def _prepare_binary_directories(bin_name: str) -> Tuple[Path, Path]:
     bin_path = Path(BIN_DIR) / bin_name
     bin_archive_dir = Path(BIN_DIR) / ".archive" / bin_name
     bin_archive_dir.mkdir(parents=True, exist_ok=True)
+    return bin_path, bin_archive_dir
 
-    log(f"[{operation}] Changing {bin_name} to version (SHA256: {target_sha256})")
 
-    source_file = ""
+def _get_source_file_for_rollback(
+    bin_name: str, target_sha256: str, bin_archive_dir: Path
+) -> Optional[str]:
+    source_file = str(bin_archive_dir / target_sha256)
+    if not os.path.exists(source_file):
+        error(
+            f"Rollback failed: archived binary not found for SHA256: {target_sha256}"
+        )
+        return None
+    log(f"Using archived binary for rollback: {source_file}")
+    return source_file
 
-    if operation == "rollback":
-        source_file = str(bin_archive_dir / target_sha256)
-        if not os.path.exists(source_file):
-            error(
-                f"Rollback failed: archived binary not found for SHA256: {target_sha256}"
-            )
-            return False
-        log(f"Using archived binary for rollback: {source_file}")
-    else:
-        kill_old_downloads(bin_name)
 
-        with tempfile.NamedTemporaryFile(
-            mode="wb", delete=False, prefix=f"{bin_name}.tmp.", dir="/tmp"
-        ) as tmp:
-            source_file = tmp.name
+def _get_source_file_for_upgrade(
+    bin_name: str, target_sha256: str
+) -> Optional[str]:
+    kill_old_downloads(bin_name)
 
-        report_progress(bin_name, target_sha256)
+    with tempfile.NamedTemporaryFile(
+        mode="wb", delete=False, prefix=f"{bin_name}.tmp.", dir="/tmp"
+    ) as tmp:
+        source_file = tmp.name
 
-        if not download_binary(bin_name, source_file):
-            report_completion(bin_name, target_sha256, "failed")
-            return False
+    report_progress(bin_name, target_sha256)
 
-        downloaded_sha256 = get_sha256sum(source_file)
+    if not download_binary(bin_name, source_file):
+        report_completion(bin_name, target_sha256, "failed")
+        return None
 
-        if downloaded_sha256 != target_sha256:
-            error(
-                f"SHA256 mismatch for downloaded {bin_name} (expected: {target_sha256}, got: {downloaded_sha256})"
-            )
-            os.unlink(source_file)
-            report_completion(bin_name, target_sha256, "failed")
-            return False
+    downloaded_sha256 = get_sha256sum(source_file)
 
+    if downloaded_sha256 != target_sha256:
+        error(
+            f"SHA256 mismatch for downloaded {bin_name} (expected: {target_sha256}, got: {downloaded_sha256})"
+        )
+        os.unlink(source_file)
+        report_completion(bin_name, target_sha256, "failed")
+        return None
+
+    return source_file
+
+
+def _archive_current_binary(bin_path: Path, bin_archive_dir: Path) -> str:
     current_sha256 = ""
     if bin_path.exists():
         current_sha256 = get_sha256sum(str(bin_path))
@@ -400,7 +410,10 @@ def change_version(
                 shutil.copy2(str(bin_path), str(archive_path))
                 os.chmod(str(archive_path), 0o755)
                 log(f"Archived current binary: {archive_path}")
+    return current_sha256
 
+
+def _install_binary_file(source_file: str, bin_path: Path, operation: str):
     if operation == "upgrade":
         shutil.copy2(source_file, str(bin_path))
         os.unlink(source_file)
@@ -408,125 +421,81 @@ def change_version(
         shutil.copy2(source_file, str(bin_path))
 
     os.chmod(str(bin_path), 0o755)
-
     log("Binary file replaced successfully")
 
-    if shutil.which("supervisorctl"):
-        log(f"Restarting service: {bin_name} via supervisor")
-        try:
-            result = subprocess.run(
-                ["supervisorctl", "restart", bin_name],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            log(result.stdout)
-            if result.stderr:
-                log(result.stderr)
 
-            if result.returncode == 0:
-                log(f"Service {bin_name} restarted successfully")
-                time.sleep(2)
+def _attempt_auto_rollback(
+    bin_name: str, bin_path: Path, bin_archive_dir: Path,
+    current_sha256: str, target_sha256: str
+) -> bool:
+    if not current_sha256:
+        return False
 
-                status_result = subprocess.run(
-                    ["supervisorctl", "status", bin_name],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
+    log("Auto-rollback: restoring previous version")
+    rollback_source = bin_archive_dir / current_sha256
+    if not rollback_source.exists():
+        error(f"Cannot rollback: archived binary not found for {current_sha256}")
+        return False
 
-                if "RUNNING" in status_result.stdout:
-                    log(f"Service {bin_name} verified running after restart")
-                    if operation == "upgrade":
-                        report_completion(bin_name, target_sha256, "success")
-                        post_update_status(bin_name, target_sha256)
-                    record_version_change(
-                        bin_name, current_sha256, target_sha256, operation, "success"
-                    )
-                    return True
-                else:
-                    error(f"Service {bin_name} not running after restart")
-                    if current_sha256:
-                        log("Auto-rollback: restoring previous version")
-                        rollback_source = bin_archive_dir / current_sha256
-                        if rollback_source.exists():
-                            shutil.copy2(str(rollback_source), str(bin_path))
-                            rollback_result = subprocess.run(
-                                ["supervisorctl", "restart", bin_name],
-                                capture_output=True,
-                                text=True,
-                                timeout=30,
-                            )
-                            if rollback_result.returncode == 0:
-                                log("Auto-rollback successful, service restarted")
-                                record_version_change(
-                                    bin_name,
-                                    target_sha256,
-                                    current_sha256,
-                                    "auto-rollback",
-                                    "success",
-                                )
-                            else:
-                                error("Auto-rollback failed - service may be down")
-                                record_version_change(
-                                    bin_name,
-                                    target_sha256,
-                                    current_sha256,
-                                    "auto-rollback",
-                                    "failed",
-                                )
+    shutil.copy2(str(rollback_source), str(bin_path))
+    rollback_result = subprocess.run(
+        ["supervisorctl", "restart", bin_name],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
 
-                    if operation == "upgrade":
-                        report_completion(bin_name, target_sha256, "failed")
-                    record_version_change(
-                        bin_name, current_sha256, target_sha256, operation, "failed"
-                    )
-                    return False
-            else:
-                error(f"Failed to restart service {bin_name}")
-                if current_sha256:
-                    log("Auto-rollback: restoring previous version")
-                    rollback_source = bin_archive_dir / current_sha256
-                    if rollback_source.exists():
-                        shutil.copy2(str(rollback_source), str(bin_path))
-                        rollback_result = subprocess.run(
-                            ["supervisorctl", "restart", bin_name],
-                            capture_output=True,
-                            text=True,
-                            timeout=30,
-                        )
-                        if rollback_result.returncode == 0:
-                            log("Auto-rollback successful, service restarted")
-                            record_version_change(
-                                bin_name,
-                                target_sha256,
-                                current_sha256,
-                                "auto-rollback",
-                                "success",
-                            )
-                        else:
-                            error("Auto-rollback failed - service may be down")
-                            record_version_change(
-                                bin_name,
-                                target_sha256,
-                                current_sha256,
-                                "auto-rollback",
-                                "failed",
-                            )
-
-                if operation == "upgrade":
-                    report_completion(bin_name, target_sha256, "failed")
-                record_version_change(
-                    bin_name, current_sha256, target_sha256, operation, "failed"
-                )
-                return False
-        except subprocess.TimeoutExpired:
-            error(f"Timeout restarting service {bin_name}")
-            return False
-        except Exception as e:
-            error(f"Error restarting service {bin_name}: {e}")
-            return False
+    if rollback_result.returncode == 0:
+        log("Auto-rollback successful, service restarted")
+        record_version_change(
+            bin_name,
+            target_sha256,
+            current_sha256,
+            "auto-rollback",
+            "success",
+        )
+        return True
     else:
+        error("Auto-rollback failed - service may be down")
+        record_version_change(
+            bin_name,
+            target_sha256,
+            current_sha256,
+            "auto-rollback",
+            "failed",
+        )
+        return False
+
+
+def _restart_service(bin_name: str) -> Optional[subprocess.CompletedProcess]:
+    result = subprocess.run(
+        ["supervisorctl", "restart", bin_name],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    log(result.stdout)
+    if result.stderr:
+        log(result.stderr)
+    return result
+
+
+def _verify_service_running(bin_name: str) -> bool:
+    time.sleep(2)
+    status_result = subprocess.run(
+        ["supervisorctl", "status", bin_name],
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    return "RUNNING" in status_result.stdout
+
+
+def _handle_service_restart(
+    bin_name: str, bin_path: Path, bin_archive_dir: Path,
+    current_sha256: str, target_sha256: str, operation: str
+) -> bool:
+    if not shutil.which("supervisorctl"):
         log("supervisorctl not found, skipping service restart")
         if operation == "upgrade":
             report_completion(bin_name, target_sha256, "success")
@@ -534,8 +503,81 @@ def change_version(
         record_version_change(
             bin_name, current_sha256, target_sha256, operation, "success"
         )
+        return True
 
-    return True
+    log(f"Restarting service: {bin_name} via supervisor")
+    try:
+        result = _restart_service(bin_name)
+
+        if result.returncode == 0:
+            log(f"Service {bin_name} restarted successfully")
+
+            if _verify_service_running(bin_name):
+                log(f"Service {bin_name} verified running after restart")
+                if operation == "upgrade":
+                    report_completion(bin_name, target_sha256, "success")
+                    post_update_status(bin_name, target_sha256)
+                record_version_change(
+                    bin_name, current_sha256, target_sha256, operation, "success"
+                )
+                return True
+            else:
+                error(f"Service {bin_name} not running after restart")
+                _attempt_auto_rollback(
+                    bin_name, bin_path, bin_archive_dir, current_sha256, target_sha256
+                )
+                if operation == "upgrade":
+                    report_completion(bin_name, target_sha256, "failed")
+                record_version_change(
+                    bin_name, current_sha256, target_sha256, operation, "failed"
+                )
+                return False
+        else:
+            error(f"Failed to restart service {bin_name}")
+            _attempt_auto_rollback(
+                bin_name, bin_path, bin_archive_dir, current_sha256, target_sha256
+            )
+            if operation == "upgrade":
+                report_completion(bin_name, target_sha256, "failed")
+            record_version_change(
+                bin_name, current_sha256, target_sha256, operation, "failed"
+            )
+            return False
+    except subprocess.TimeoutExpired:
+        error(f"Timeout restarting service {bin_name}")
+        return False
+    except Exception as e:
+        error(f"Error restarting service {bin_name}: {e}")
+        return False
+
+
+def change_version(
+    bin_name: str, target_sha256: str, operation: str = "upgrade"
+) -> bool:
+    if not _validate_change_version_params(bin_name, target_sha256):
+        return False
+
+    bin_path, bin_archive_dir = _prepare_binary_directories(bin_name)
+
+    log(f"[{operation}] Changing {bin_name} to version (SHA256: {target_sha256})")
+
+    if operation == "rollback":
+        source_file = _get_source_file_for_rollback(
+            bin_name, target_sha256, bin_archive_dir
+        )
+    else:
+        source_file = _get_source_file_for_upgrade(bin_name, target_sha256)
+
+    if not source_file:
+        return False
+
+    current_sha256 = _archive_current_binary(bin_path, bin_archive_dir)
+    _install_binary_file(source_file, bin_path, operation)
+
+    return _handle_service_restart(
+        bin_name, bin_path, bin_archive_dir,
+        current_sha256, target_sha256, operation
+    )
 
 
 def record_version_change(
