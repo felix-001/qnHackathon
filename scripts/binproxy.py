@@ -79,9 +79,15 @@ def get_node_info() -> Dict[str, str]:
 
 def keepalive_check():
     node_info = get_node_info()
-    # /api/v1/keepalive/<node_id>
+    node_id = socket.gethostname()
+    node_info["node_id"] = node_id
+    
     try:
-        response = requests.get(f"{BIN_MANAGER_API}/keepalive", timeout=10)
+        response = requests.get(
+            f"{BIN_MANAGER_API}/keepalive",
+            params={"node_id": node_id},
+            timeout=10,
+        )
         if response.status_code != 200:
             raise Exception("Not registered")
         log("Keepalive check successful")
@@ -239,13 +245,11 @@ def kill_old_downloads(bin_name: str):
 
 
 def post_update_status(bin_name: str, new_sha256: str) -> bool:
-    node_name = socket.gethostname()
+    node_id = socket.gethostname()
 
     payload = {
-        "nodeName": node_name,
-        "binName": bin_name,
-        "sha256": new_sha256,
-        "version": "latest",
+        "node_id": node_id,
+        "sha256sum": new_sha256,
     }
 
     try:
@@ -294,15 +298,9 @@ def query_latest_sha256(bin_name: str) -> Optional[str]:
         response = requests.get(url, timeout=10)
         if response.status_code == 200:
             data = response.json()
-            if "sha256" in data:
-                return data["sha256"]
-
-        log(f"Trying alternative endpoint for {bin_name}")
-        url = f"{BIN_MANAGER_API}/releases/latest/{bin_name}/sha256"
-        response = requests.get(url, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            if "sha256" in data:
+            if "sha256sum" in data:
+                return data["sha256sum"]
+            elif "sha256" in data:
                 return data["sha256"]
 
         error(f"Failed to query latest SHA256 for {bin_name}")
@@ -338,24 +336,12 @@ def download_binary(bin_name: str, temp_file: str) -> bool:
                     f.write(chunk)
             os.chmod(temp_file, 0o755)
             return True
-    except Exception:
-        pass
-
-    log("Trying alternative download endpoint")
-    url = f"{BIN_MANAGER_API}/releases/latest/{bin_name}/download"
-    try:
-        response = requests.get(url, timeout=DOWNLOAD_TIMEOUT, stream=True)
-        if response.status_code == 200:
-            with open(temp_file, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            os.chmod(temp_file, 0o755)
-            return True
-    except Exception:
-        pass
-
-    error(f"Failed to download {bin_name}")
-    return False
+        else:
+            error(f"Failed to download {bin_name}: HTTP {response.status_code}")
+            return False
+    except Exception as e:
+        error(f"Failed to download {bin_name}: {e}")
+        return False
 
 
 def change_version(
