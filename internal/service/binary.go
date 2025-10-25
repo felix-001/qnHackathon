@@ -35,11 +35,11 @@ func NewBinaryService(binDir string) *BinaryService {
 
 func (s *BinaryService) GetBinaryHash(name string) (string, error) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	if bin, exists := s.binaries[name]; exists {
+		s.mu.RUnlock()
 		return bin.Hash, nil
 	}
+	s.mu.RUnlock()
 
 	binPath := filepath.Join(s.binDir, name)
 	hash, err := s.calculateFileHash(binPath)
@@ -47,7 +47,6 @@ func (s *BinaryService) GetBinaryHash(name string) (string, error) {
 		return "", err
 	}
 
-	s.mu.RUnlock()
 	s.mu.Lock()
 	s.binaries[name] = &model.BinaryInfo{
 		Name:      name,
@@ -56,7 +55,6 @@ func (s *BinaryService) GetBinaryHash(name string) (string, error) {
 		UpdatedAt: time.Now(),
 	}
 	s.mu.Unlock()
-	s.mu.RLock()
 
 	return hash, nil
 }

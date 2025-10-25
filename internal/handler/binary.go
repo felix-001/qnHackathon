@@ -24,15 +24,15 @@ func (h *BinaryHandler) GetBinaryHash(c *gin.Context) {
 	hash, err := h.service.GetBinaryHash(binName)
 	if err != nil {
 		c.JSON(http.StatusNotFound, model.Response{
-			Code:    http.StatusNotFound,
+			Code:    1,
 			Message: "Binary not found: " + err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    http.StatusOK,
-		Message: "Success",
+		Code:    0,
+		Message: "success",
 		Data: map[string]interface{}{
 			"name":    binName,
 			"version": "latest",
@@ -50,23 +50,23 @@ func (h *BinaryHandler) UpdateBinaryHash(c *gin.Context) {
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{
-			Code:    http.StatusBadRequest,
-			Message: "Invalid request: " + err.Error(),
+			Code:    1,
+			Message: err.Error(),
 		})
 		return
 	}
 
 	if err := h.service.UpdateBinaryHash(binName, req.Hash); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
-			Code:    http.StatusInternalServerError,
-			Message: "Failed to update binary hash: " + err.Error(),
+			Code:    1,
+			Message: err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    http.StatusOK,
-		Message: "Binary hash updated successfully",
+		Code:    0,
+		Message: "success",
 	})
 }
 
@@ -74,7 +74,7 @@ func (h *BinaryHandler) Keepalive(c *gin.Context) {
 	nodeName := c.Query("node")
 	if nodeName == "" {
 		c.JSON(http.StatusBadRequest, model.Response{
-			Code:    http.StatusBadRequest,
+			Code:    1,
 			Message: "Node name is required",
 		})
 		return
@@ -87,38 +87,38 @@ func (h *BinaryHandler) Keepalive(c *gin.Context) {
 			var nodeInfo model.NodeInfo
 			if err := c.ShouldBindJSON(&nodeInfo); err != nil {
 				c.JSON(http.StatusBadRequest, model.Response{
-					Code:    http.StatusBadRequest,
-					Message: "Invalid request: " + err.Error(),
+					Code:    1,
+					Message: err.Error(),
 				})
 				return
 			}
 
 			if err := h.service.UpdateNodeInfo(&nodeInfo); err != nil {
 				c.JSON(http.StatusInternalServerError, model.Response{
-					Code:    http.StatusInternalServerError,
-					Message: "Failed to register node: " + err.Error(),
+					Code:    1,
+					Message: err.Error(),
 				})
 				return
 			}
 
 			c.JSON(http.StatusOK, model.Response{
-				Code:    http.StatusOK,
-				Message: "Node registered successfully",
+				Code:    0,
+				Message: "success",
 				Data:    nodeInfo,
 			})
 			return
 		}
 
 		c.JSON(http.StatusNotFound, model.Response{
-			Code:    http.StatusNotFound,
+			Code:    1,
 			Message: "Node not found. Please POST to register.",
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    http.StatusOK,
-		Message: "Success",
+		Code:    0,
+		Message: "success",
 		Data:    node,
 	})
 }
