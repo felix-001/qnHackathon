@@ -9,5 +9,9 @@
 		"url": "http://101.133.131.188:30811",
 		"privateToken": "zq_z86jKq18papzyqNF-",
 		"projectID": "root/streamd"
+	},
+	"mongoConf": {
+		"url": "mongodb://localhost:27017",
+		"database": "qnHackathon"
 	}
 }

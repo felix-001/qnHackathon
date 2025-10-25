@@ -7,12 +7,11 @@ import (
 	"os"
 
 	cfg "github.com/felix-001/qnHackathon/internal/config"
-
+	"github.com/felix-001/qnHackathon/internal/db"
 	"github.com/felix-001/qnHackathon/internal/handler"
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	//qconfig "github.com/qiniu/x/config"
 )
 
 func main() {
@@ -29,6 +28,14 @@ func main() {
 		log.Println("unmarshal fail", *configFile, err)
 		return
 	}
+
+	mongodb, err := db.NewMongoDB(cfg.MongoConf)
+	if err != nil {
+		log.Println("Failed to connect to MongoDB:", err)
+		return
+	}
+	defer mongodb.Close()
+
 	mgr := service.NewManager(cfg)
 	mgr.Build()
 	r := gin.Default()
@@ -37,8 +44,8 @@ func main() {
 
 	r.LoadHTMLGlob("web/templates/*.html")
 
-	projectService := service.NewProjectService()
-	releaseService := service.NewReleaseService()
+	projectService := service.NewProjectService(mongodb)
+	releaseService := service.NewReleaseService(mongodb)
 	monitoringService := service.NewMonitoringService()
 
 	projectHandler := handler.NewProjectHandler(projectService)
