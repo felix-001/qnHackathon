@@ -149,7 +149,7 @@
                     const tbody = document.getElementById('releaseList');
                     tbody.innerHTML = (data.data || []).map(r => `
                         <tr>
-                            <td>${r.projectName || '-'}</td>
+                            <td>${r.projectId}</td>
                             <td>${r.version}</td>
                             <td>${r.environment}</td>
                             <td>${r.strategy}</td>
