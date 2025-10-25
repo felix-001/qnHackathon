@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/felix-001/qnHackathon/internal/model"
 	"github.com/felix-001/qnHackathon/internal/service"
@@ -51,7 +53,14 @@ func (h *ReleaseHandler) Create(c *gin.Context) {
 		buildInfo := h.manager.Build()
 		if buildInfo != nil {
 			if buildInfo.GitlabPRURL != "" {
-				h.service.UpdateGitlabPR(release.ID, buildInfo.GitlabPRURL)
+				u, err := url.Parse(buildInfo.GitlabPRURL)
+				if err != nil {
+					log.Println("parse GitlabPRURL err:", buildInfo.GitlabPRURL)
+					return
+				}
+				u.Host = "101.133.131.188:30811"
+				buildInfo.GitlabPRURL = u.String()
+				h.service.UpdateGitlabPR(release.ID, u.String())
 			}
 			if buildInfo.TarFileName != "" {
 				h.service.UpdateTarFileName(release.ID, buildInfo.TarFileName)
