@@ -1,0 +1,51 @@
+pipeline {
+    agent any // 在任意可用节点运行
+     tools {
+        // 假设已在 Jenkins 后台配置好名为 'go1.21.0' 的 Go 安装
+        go '1.25.3'
+    }
+    environment {
+        // 设置 GOPROXY 加速模块下载（非常重要！）
+        GOPROXY = 'https://goproxy.cn,direct'
+    }
+    stages {
+        // 阶段 1：拉取 GitHub 代码
+        stage('Checkout') {
+            steps {
+                git(
+                    // credentialsId: 'your-github-credential-id', // 替换为你的凭据 ID
+                    branch: 'main',                             // 分支名
+                    url: 'https://github.com/felix-001/qnHackathon.git' // GitHub 仓库地址
+                )
+            }
+        }
+
+        // 阶段 2：编译代码（示例为 Go，其他语言替换命令）
+        stage('Build') {
+            steps {
+                sh 'cd cmd/manager; go build -o manager' // 编译并输出到 bin/app
+                //sh 'go version'
+                // 其他语言示例：
+                // Java (Maven): sh 'mvn clean package'
+                // C/C++: sh 'make && make install'
+            }
+        }
+
+        // 阶段 3：归档生成的文件（可选）
+        stage('Archive Artifacts') {
+            steps {
+                archiveArtifacts artifacts: 'bin/**', // 归档 bin 目录下所有文件
+                allowEmptyArchive: true
+            }
+        }
+    }
+
+    // 失败时清理或通知（可选）
+    post {
+        failure {
+            mail to: '279191230@qq.com',
+                 subject: "构建失败: ${currentBuild.fullDisplayName}",
+                 body: "详情: ${env.BUILD_URL}"
+        }
+    }
+}
