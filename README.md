@@ -75,7 +75,22 @@ go run cmd/manager/main.go -f internal/config/manager.json
 - `POST /api/v1/releases` - 创建发布
 - `GET /api/v1/releases/:id` - 获取发布详情
 - `POST /api/v1/releases/:id/rollback` - 回滚发布
+- `POST /api/v1/releases/:id/approve` - 审批发布
+- `POST /api/v1/releases/:id/deploy` - 部署发布
 - `GET /api/v1/monitoring/realtime` - 获取实时监控数据
+
+#### Bin管理API
+
+- `GET /api/v1/keepalive?node_id=<id>` - 查询节点状态
+- `POST /api/v1/keepalive` - 注册节点
+  - 请求体: `{"node_id": "string", "cpu_arch": "string", "os_release": "string", "node_name": "string", "bin_proxy_version": "string"}`
+- `GET /api/v1/bins/:bin_name` - 获取二进制文件信息
+- `POST /api/v1/bins/:bin_name` - 更新节点的二进制文件版本
+  - 请求体: `{"node_id": "string", "sha256sum": "string"}`
+- `POST /api/v1/bins/:bin_name/progress` - 记录二进制文件更新进度
+  - 请求体: `{"nodeName": "string", "targetHash": "string", "status": "string", "processingTime": int}`
+- `GET /api/v1/download/:bin_file_name` - 下载二进制文件
+- `GET /health` - 健康检查
 
 ### Web页面
 
