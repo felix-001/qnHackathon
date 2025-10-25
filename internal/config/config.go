@@ -19,8 +19,14 @@ type JenkinsConf struct {
 	ProjectID  string `json:"projectID"`
 }
 
+type MongoConf struct {
+	URL      string `json:"url"`
+	Database string `json:"database"`
+}
+
 type Config struct {
 	GitHubConf  GitHubConf  `json:"githubConf"`
 	GitlabConf  GitlabConf  `json:"gitlabConf"`
 	JenkinsConf JenkinsConf `json:"jenkinsConf"`
+	MongoConf   MongoConf   `json:"mongoConf"`
 }

@@ -1,46 +1,75 @@
 package service
 
 import (
-	"github.com/felix-001/qnHackathon/internal/model"
+	"context"
 	"time"
+
+	"github.com/felix-001/qnHackathon/internal/db"
+	"github.com/felix-001/qnHackathon/internal/model"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type ReleaseService struct {
-	releases []model.Release
+	collection *mongo.Collection
 }
 
-func NewReleaseService() *ReleaseService {
+func NewReleaseService(mongodb *db.MongoDB) *ReleaseService {
 	return &ReleaseService{
-		releases: make([]model.Release, 0),
+		collection: mongodb.Database.Collection("releases"),
 	}
 }
 
 func (s *ReleaseService) List() []model.Release {
-	return s.releases
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := s.collection.Find(ctx, bson.M{})
+	if err != nil {
+		return []model.Release{}
+	}
+	defer cursor.Close(ctx)
+
+	var releases []model.Release
+	if err = cursor.All(ctx, &releases); err != nil {
+		return []model.Release{}
+	}
+
+	return releases
 }
 
 func (s *ReleaseService) Create(release *model.Release) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
 	release.CreatedAt = time.Now()
 	release.Status = "pending_approval"
-	s.releases = append(s.releases, *release)
-	return nil
+
+	_, err := s.collection.InsertOne(ctx, release)
+	return err
 }
 
 func (s *ReleaseService) Get(id string) (*model.Release, error) {
-	for _, r := range s.releases {
-		if r.ID == id {
-			return &r, nil
-		}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var release model.Release
+	filter := bson.M{"_id": id}
+	err := s.collection.FindOne(ctx, filter).Decode(&release)
+	if err != nil {
+		return nil, err
 	}
-	return nil, nil
+
+	return &release, nil
 }
 
 func (s *ReleaseService) Rollback(id string, targetVersion string, reason string) error {
-	for i, r := range s.releases {
-		if r.ID == id {
-			s.releases[i].Status = "rolled_back"
-			return nil
-		}
-	}
-	return nil
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{"status": "rolled_back"}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
 }

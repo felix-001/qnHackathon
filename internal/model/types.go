@@ -3,43 +3,43 @@ package model
 import "time"
 
 type Project struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	Code           string    `json:"code"`
-	Description    string    `json:"description"`
-	Owner          string    `json:"owner"`
-	RepositoryURL  string    `json:"repositoryUrl"`
-	BuildTool      string    `json:"buildTool"`
-	DeploymentType string    `json:"deploymentType"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	ID             string    `json:"id" bson:"_id,omitempty"`
+	Name           string    `json:"name" bson:"name"`
+	Code           string    `json:"code" bson:"code"`
+	Description    string    `json:"description" bson:"description"`
+	Owner          string    `json:"owner" bson:"owner"`
+	RepositoryURL  string    `json:"repositoryUrl" bson:"repositoryUrl"`
+	BuildTool      string    `json:"buildTool" bson:"buildTool"`
+	DeploymentType string    `json:"deploymentType" bson:"deploymentType"`
+	Status         string    `json:"status" bson:"status"`
+	CreatedAt      time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
 type Application struct {
-	ID             string    `json:"id"`
-	ProjectID      string    `json:"projectId"`
-	Name           string    `json:"name"`
-	Code           string    `json:"code"`
-	Description    string    `json:"description"`
-	HealthCheckURL string    `json:"healthCheckUrl"`
-	CreatedAt      time.Time `json:"createdAt"`
-	UpdatedAt      time.Time `json:"updatedAt"`
+	ID             string    `json:"id" bson:"_id,omitempty"`
+	ProjectID      string    `json:"projectId" bson:"projectId"`
+	Name           string    `json:"name" bson:"name"`
+	Code           string    `json:"code" bson:"code"`
+	Description    string    `json:"description" bson:"description"`
+	HealthCheckURL string    `json:"healthCheckUrl" bson:"healthCheckUrl"`
+	CreatedAt      time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt      time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
 type Release struct {
-	ID            string     `json:"id"`
-	ProjectID     string     `json:"projectId"`
-	ApplicationID string     `json:"applicationId"`
-	Version       string     `json:"version"`
-	Environment   string     `json:"environment"`
-	Strategy      string     `json:"strategy"`
-	Status        string     `json:"status"`
-	Description   string     `json:"description"`
-	Scheduler     string     `json:"scheduler"`
-	StartedAt     *time.Time `json:"startedAt,omitempty"`
-	CompletedAt   *time.Time `json:"completedAt,omitempty"`
-	CreatedAt     time.Time  `json:"createdAt"`
+	ID            string     `json:"id" bson:"_id,omitempty"`
+	ProjectID     string     `json:"projectId" bson:"projectId"`
+	ApplicationID string     `json:"applicationId" bson:"applicationId"`
+	Version       string     `json:"version" bson:"version"`
+	Environment   string     `json:"environment" bson:"environment"`
+	Strategy      string     `json:"strategy" bson:"strategy"`
+	Status        string     `json:"status" bson:"status"`
+	Description   string     `json:"description" bson:"description"`
+	Scheduler     string     `json:"scheduler" bson:"scheduler"`
+	StartedAt     *time.Time `json:"startedAt,omitempty" bson:"startedAt,omitempty"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty" bson:"completedAt,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt" bson:"createdAt"`
 }
 
 type ReleaseStage struct {
