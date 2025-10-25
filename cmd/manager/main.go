@@ -49,7 +49,7 @@ func main() {
 	binService := service.NewBinService()
 
 	projectHandler := handler.NewProjectHandler(projectService)
-	releaseHandler := handler.NewReleaseHandler(releaseService, mgr)
+	releaseHandler := handler.NewReleaseHandler(releaseService, mgr, projectService)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	binHandler := handler.NewBinHandler(binService)
 	binHandler.SetGitLabMgr(service.NewGitLabMgr(cfg.GitlabConf))
