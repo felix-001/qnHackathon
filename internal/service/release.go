@@ -85,6 +85,17 @@ func (s *ReleaseService) UpdateGitlabPR(id string, gitlabPrUrl string) error {
 	return err
 }
 
+func (s *ReleaseService) UpdateTarFileName(id string, tarFileName string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{"tarFileName": tarFileName}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
 func (s *ReleaseService) Approve(id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
