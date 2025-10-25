@@ -10,10 +10,14 @@ import (
 
 type ReleaseHandler struct {
 	service *service.ReleaseService
+	manager *service.Manager
 }
 
-func NewReleaseHandler(service *service.ReleaseService) *ReleaseHandler {
-	return &ReleaseHandler{service: service}
+func NewReleaseHandler(service *service.ReleaseService, manager *service.Manager) *ReleaseHandler {
+	return &ReleaseHandler{
+		service: service,
+		manager: manager,
+	}
 }
 
 func (h *ReleaseHandler) List(c *gin.Context) {
@@ -42,6 +46,13 @@ func (h *ReleaseHandler) Create(c *gin.Context) {
 		})
 		return
 	}
+
+	go func() {
+		gitlabPrUrl := h.manager.Build()
+		if gitlabPrUrl != "" {
+			h.service.UpdateGitlabPR(release.ID, gitlabPrUrl)
+		}
+	}()
 
 	c.JSON(http.StatusOK, model.Response{
 		Code:    0,
@@ -89,6 +100,44 @@ func (h *ReleaseHandler) Rollback(c *gin.Context) {
 		})
 		return
 	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    0,
+		Message: "success",
+	})
+}
+
+func (h *ReleaseHandler) Approve(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.service.Approve(id); err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    1,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    0,
+		Message: "success",
+	})
+}
+
+func (h *ReleaseHandler) Deploy(c *gin.Context) {
+	id := c.Param("id")
+
+	if err := h.service.Deploy(id); err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    1,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	go func() {
+		h.service.Complete(id)
+	}()
 
 	c.JSON(http.StatusOK, model.Response{
 		Code:    0,
