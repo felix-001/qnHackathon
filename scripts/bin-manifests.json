@@ -1,0 +1,14 @@
+{
+  "binaries": [
+    {
+      "name": "manager",
+      "version": "latest",
+      "currentMd5": ""
+    },
+    {
+      "name": "example-service",
+      "version": "latest",
+      "currentMd5": ""
+    }
+  ]
+}
