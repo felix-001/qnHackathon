@@ -30,7 +30,7 @@ func main() {
 		return
 	}
 	mgr := service.NewManager(cfg)
-	mgr.Run()
+	mgr.Build()
 	r := gin.Default()
 
 	r.Use(cors.Default())
