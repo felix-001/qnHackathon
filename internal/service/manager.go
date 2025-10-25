@@ -21,37 +21,35 @@ func NewManager(conf *cfg.Config) *Manager {
 	}
 }
 
-func (m *Manager) Build() {
+func (m *Manager) Build() string {
 	m.jenkinsMgr.StartJob()
 
 	buildResult := m.jenkinsMgr.WaitForJobCompletion()
 	if buildResult == nil || !buildResult.IsSuccess {
 		log.Logger.Error().Msg("Jenkins build failed or timed out")
-		return
+		return ""
 	}
 
 	streamdPath, err := m.jenkinsMgr.DownloadBin(buildResult, "streamd")
 	if err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to download streamd")
-		return
+		return ""
 	}
 	log.Logger.Info().Msgf("Successfully downloaded streamd to: %s", streamdPath)
 
 	parts := strings.Split(streamdPath, "/")
 	if len(parts) != 3 {
 		log.Logger.Info().Msgf("parse streamdPath err")
-		return
+		return ""
 	}
 
 	m.gitlabMgr.UpdateVersion("streamd.json", parts[2])
 	mrUrl := m.gitlabMgr.GetMrUrl(parts[2])
 	if mrUrl == "" {
 		log.Logger.Error().Msg("GetMrUrl: 无法获取 MergeRequest URL")
-		return
+		return ""
 	}
 	log.Logger.Info().Msgf("GetMrUrl: %s", mrUrl)
 
-	//m.gitlabMgr.GetMergeRequest()
-	//m.gitlabMgr.CreateBranch("streamd")
-	//m.gitlabMgr.GetFile("streamd", "streamd.json")
+	return mrUrl
 }

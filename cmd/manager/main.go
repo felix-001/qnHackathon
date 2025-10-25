@@ -37,7 +37,6 @@ func main() {
 	defer mongodb.Close()
 
 	mgr := service.NewManager(cfg)
-	mgr.Build()
 	r := gin.Default()
 
 	r.Use(cors.Default())
@@ -49,7 +48,7 @@ func main() {
 	monitoringService := service.NewMonitoringService()
 
 	projectHandler := handler.NewProjectHandler(projectService)
-	releaseHandler := handler.NewReleaseHandler(releaseService)
+	releaseHandler := handler.NewReleaseHandler(releaseService, mgr)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	webHandler := handler.NewWebHandler()
 
@@ -70,6 +69,8 @@ func main() {
 		api.POST("/releases", releaseHandler.Create)
 		api.GET("/releases/:id", releaseHandler.Get)
 		api.POST("/releases/:id/rollback", releaseHandler.Rollback)
+		api.POST("/releases/:id/approve", releaseHandler.Approve)
+		api.POST("/releases/:id/deploy", releaseHandler.Deploy)
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
 	}

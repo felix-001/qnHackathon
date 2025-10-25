@@ -73,3 +73,55 @@ func (s *ReleaseService) Rollback(id string, targetVersion string, reason string
 	_, err := s.collection.UpdateOne(ctx, filter, update)
 	return err
 }
+
+func (s *ReleaseService) UpdateGitlabPR(id string, gitlabPrUrl string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{"gitlabPrUrl": gitlabPrUrl}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func (s *ReleaseService) Approve(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{"status": "approved"}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func (s *ReleaseService) Deploy(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	now := time.Now()
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{
+		"status":    "deploying",
+		"startedAt": now,
+	}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
+}
+
+func (s *ReleaseService) Complete(id string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	now := time.Now()
+	filter := bson.M{"_id": id}
+	update := bson.M{"$set": bson.M{
+		"status":      "completed",
+		"completedAt": now,
+	}}
+
+	_, err := s.collection.UpdateOne(ctx, filter, update)
+	return err
+}
