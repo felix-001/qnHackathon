@@ -20,4 +20,5 @@ func NewManager(conf *cfg.Config) *Manager {
 
 func (m *Manager) Run() {
 	m.jenkinsMgr.StartJob()
+	m.gitlabMgr.CreateBranch("streamd")
 }
