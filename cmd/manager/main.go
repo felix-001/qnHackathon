@@ -46,10 +46,14 @@ func main() {
 	projectService := service.NewProjectService(mongodb)
 	releaseService := service.NewReleaseService(mongodb)
 	monitoringService := service.NewMonitoringService()
+	binService := service.NewBinService()
 
 	projectHandler := handler.NewProjectHandler(projectService)
-	releaseHandler := handler.NewReleaseHandler(releaseService, mgr)
+	releaseHandler := handler.NewReleaseHandler(releaseService, mgr, projectService)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
+	binHandler := handler.NewBinHandler(binService)
+	binHandler.SetGitLabMgr(service.NewGitLabMgr(cfg.GitlabConf))
+	binHandler.SetReleaseService(releaseService)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)
@@ -67,13 +71,23 @@ func main() {
 
 		api.GET("/releases", releaseHandler.List)
 		api.POST("/releases", releaseHandler.Create)
+		api.POST("/releases/batch-delete", releaseHandler.BatchDelete)
 		api.GET("/releases/:id", releaseHandler.Get)
 		api.POST("/releases/:id/rollback", releaseHandler.Rollback)
 		api.POST("/releases/:id/approve", releaseHandler.Approve)
 		api.POST("/releases/:id/deploy", releaseHandler.Deploy)
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
+
+		api.GET("/keepalive", binHandler.GetKeepalive)
+		api.POST("/keepalive", binHandler.PostKeepalive)
+		api.GET("/bins/:bin_name", binHandler.GetBin)
+		api.POST("/bins/:bin_name", binHandler.PostBin)
+		api.POST("/bins/:bin_name/progress", binHandler.PostProgress)
+		api.GET("/download/:bin_file_name", binHandler.Download)
 	}
+
+	r.GET("/health", binHandler.Health)
 
 	r.Run(":8081")
 }

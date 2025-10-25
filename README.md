@@ -1,6 +1,6 @@
 # qnHackathon
 
-智能发布控制台 - Go语言实现
+智能发布控制台
 
 ## 项目结构
 
@@ -44,7 +44,7 @@
 
 ## 技术栈
 
-- **语言**: Go 1.21
+- **语言**: Go 1.25.3
 - **Web框架**: Gin
 - **前端**: HTML + 原生JavaScript
 - **架构**: 分层架构（Handler -> Service -> Model）
@@ -75,7 +75,22 @@ go run cmd/manager/main.go -f internal/config/manager.json
 - `POST /api/v1/releases` - 创建发布
 - `GET /api/v1/releases/:id` - 获取发布详情
 - `POST /api/v1/releases/:id/rollback` - 回滚发布
+- `POST /api/v1/releases/:id/approve` - 审批发布
+- `POST /api/v1/releases/:id/deploy` - 部署发布
 - `GET /api/v1/monitoring/realtime` - 获取实时监控数据
+
+#### Bin管理API
+
+- `GET /api/v1/keepalive?node_id=<id>` - 查询节点状态
+- `POST /api/v1/keepalive` - 注册节点
+  - 请求体: `{"node_id": "string", "cpu_arch": "string", "os_release": "string", "node_name": "string", "bin_proxy_version": "string"}`
+- `GET /api/v1/bins/:bin_name` - 获取二进制文件信息
+- `POST /api/v1/bins/:bin_name` - 更新节点的二进制文件版本
+  - 请求体: `{"node_id": "string", "sha256sum": "string"}`
+- `POST /api/v1/bins/:bin_name/progress` - 记录二进制文件更新进度
+  - 请求体: `{"nodeName": "string", "targetHash": "string", "status": "string", "processingTime": int}`
+- `GET /api/v1/download/:bin_file_name` - 下载二进制文件
+- `GET /health` - 健康检查
 
 ### Web页面
 
@@ -98,9 +113,15 @@ go run cmd/manager/main.go -f internal/config/manager.json
 
 ## 开发计划
 
-- [ ] 数据持久化（MySQL/PostgreSQL）
+- [x] 数据持久化（mongo）
+- [x] 前端web页面
+- [x] jenkins、github、gitlab联动
+- [x] bin-proxy开发
+- [ ] 下发nginx配置，导入灰度流量
+- [ ] 获取prometheus异常指标，自动回滚
+- [ ] manager集成kubectl功能，支持镜像发布
+- [ ] 智能
 - [ ] 认证授权（JWT）
-- [ ] WebSocket实时推送
 - [ ] 审批流服务
 - [ ] 通知服务集成
 - [ ] 完善单元测试
