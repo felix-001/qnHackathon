@@ -3,20 +3,16 @@
     {
       "serviceName": "manager",
       "binaryName": "manager",
-      "version": "latest",
-      "currentSha256": "",
-      "port": 8080,
-      "versionHistory": [],
-      "versions": {}
+      "version": "",
+      "previousVersion": "",
+      "port": 8080
     },
     {
       "serviceName": "example-service",
       "binaryName": "example-service",
-      "version": "latest",
-      "currentSha256": "",
-      "port": 9090,
-      "versionHistory": [],
-      "versions": {}
+      "version": "",
+      "previousVersion": "",
+      "port": 9090
     }
   ],
   "nodeInfo": {

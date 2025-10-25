@@ -144,21 +144,13 @@ get_previous_version() {
     fi
 
     if command -v jq &> /dev/null; then
-        local history
-        history=$(jq -r --arg name "$bin_name" \
-            '.binaries[] | select(.binaryName == $name) | .versionHistory // []' \
+        local prev_sha256
+        prev_sha256=$(jq -r --arg name "$bin_name" \
+            '.binaries[] | select(.binaryName == $name) | .previousVersion // empty' \
             "$BIN_MANIFESTS" 2>/dev/null)
 
-        if [[ -z "$history" ]] || [[ "$history" == "[]" ]]; then
-            error "No version history found for $bin_name"
-            return 1
-        fi
-
-        local prev_sha256
-        prev_sha256=$(echo "$history" | jq -r '.[-2].to // .[-1].from // empty' 2>/dev/null)
-
         if [[ -z "$prev_sha256" ]] || [[ "$prev_sha256" == "null" ]]; then
-            error "Cannot determine previous version for $bin_name"
+            error "No previous version found for $bin_name"
             return 1
         fi
 
