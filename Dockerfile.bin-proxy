@@ -1,0 +1,20 @@
+FROM alpine:latest
+
+RUN apk --no-cache add \
+    bash \
+    curl \
+    jq \
+    supervisor \
+    coreutils
+
+WORKDIR /app
+
+COPY scripts/bin-proxy.sh /usr/local/bin/bin-proxy
+COPY scripts/bin-manifests.json /etc/bin-proxy/bin-manifests.json
+
+RUN chmod +x /usr/local/bin/bin-proxy && \
+    mkdir -p /var/run/bin-proxy /var/log/bin-proxy
+
+RUN echo '* * * * * /usr/local/bin/bin-proxy >> /var/log/bin-proxy/bin-proxy.log 2>&1' > /etc/crontabs/root
+
+CMD ["crond", "-f", "-l", "2"]
