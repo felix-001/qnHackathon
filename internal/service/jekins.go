@@ -369,3 +369,78 @@ func (s *JenkinsMgr) StartJob() {
 		return
 	}
 }
+
+func (s *JenkinsMgr) WaitForJobCompletion() *BuildResult {
+	ctx := context.Background()
+	job, err := s.Client.GetJob(ctx, s.Conf.ProjectID)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get job")
+		return nil
+	}
+
+	startTime := time.Now()
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			lastBuild, err := job.GetLastBuild(ctx)
+			if err != nil {
+				log.Logger.Error().Err(err).Msg("Failed to get last build")
+				continue
+			}
+
+			if lastBuild.IsRunning(ctx) {
+				log.Logger.Info().Msgf("Build %d is still running...", lastBuild.GetBuildNumber())
+			} else {
+				isBuilding, buildResult := s.GetBuildStatus(lastBuild.Raw.QueueID)
+				if !isBuilding && buildResult != nil && buildResult.IsFinished {
+					if buildResult.IsSuccess {
+						log.Logger.Info().Msgf("Build completed successfully: %d", buildResult.BuildID)
+						return buildResult
+					}
+					log.Logger.Error().Msgf("Build failed: %v", buildResult.BuildError)
+					return buildResult
+				}
+			}
+
+			if time.Since(startTime) > 3*time.Hour {
+				log.Logger.Error().Msg("Build timeout after 3 hours")
+				return &BuildResult{
+					IsFinished: true,
+					IsSuccess:  false,
+					Result:     "timeout",
+				}
+			}
+		}
+	}
+}
+
+func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
+	if buildResult == nil || buildResult.Build == nil {
+		return "", fmt.Errorf("invalid build result")
+	}
+
+	ctx := context.Background()
+	artifacts := buildResult.Build.GetArtifacts()
+	
+	for _, artifact := range artifacts {
+		if artifact.FileName == "streamd" {
+			downloadDir := "./downloads"
+			success, err := artifact.SaveToDir(ctx, downloadDir)
+			if err != nil {
+				return "", fmt.Errorf("failed to save artifact: %w", err)
+			}
+			if !success {
+				return "", fmt.Errorf("failed to save artifact: unknown error")
+			}
+			
+			downloadPath := fmt.Sprintf("%s/%s", downloadDir, artifact.FileName)
+			log.Logger.Info().Msgf("Successfully downloaded streamd to: %s", downloadPath)
+			return downloadPath, nil
+		}
+	}
+	
+	return "", fmt.Errorf("streamd artifact not found in build")
+}
