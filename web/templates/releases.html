@@ -116,12 +116,24 @@
         function getStatusTag(status) {
             const map = {
                 'pending_approval': '<span class="tag tag-orange">待审批</span>',
+                'approved': '<span class="tag tag-orange">已批准</span>',
                 'deploying': '<span class="tag tag-blue">部署中</span>',
                 'completed': '<span class="tag tag-green">已完成</span>',
                 'failed': '<span class="tag tag-red">失败</span>',
                 'rolled_back': '<span class="tag">已回滚</span>'
             };
             return map[status] || status;
+        }
+
+        function getActionButton(r) {
+            if (r.status === 'pending_approval') {
+                return `<button class="btn" onclick="approveReview('${r.id}')">review通过</button>`;
+            } else if (r.status === 'approved') {
+                return `<button class="btn" onclick="deploy('${r.id}')">发布</button>`;
+            } else if (r.status === 'completed') {
+                return `<button class="btn btn-danger" onclick="rollback('${r.id}')">回滚</button>`;
+            }
+            return '';
         }
 
         function loadReleases() {
@@ -139,7 +151,8 @@
                             <td>${r.scheduler}</td>
                             <td>${new Date(r.createdAt).toLocaleString()}</td>
                             <td>
-                                ${r.status === 'completed' ? `<button class="btn btn-danger" onclick="rollback('${r.id}')">回滚</button>` : ''}
+                                ${r.gitlabPRURL ? `<a href="${r.gitlabPRURL}" target="_blank" class="btn" style="margin-right:8px;">GitLab PR</a>` : ''}
+                                ${getActionButton(r)}
                             </td>
                         </tr>
                     `).join('');
@@ -162,6 +175,24 @@
                 loadReleases();
             });
         });
+
+        function approveReview(id) {
+            if (confirm('确定通过 review?')) {
+                fetch(`/api/v1/releases/${id}/approve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }).then(() => loadReleases());
+            }
+        }
+
+        function deploy(id) {
+            if (confirm('确定开始发布?')) {
+                fetch(`/api/v1/releases/${id}/deploy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                }).then(() => loadReleases());
+            }
+        }
 
         function rollback(id) {
             if (confirm('确定回滚?')) {

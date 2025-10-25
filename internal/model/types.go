@@ -37,6 +37,7 @@ type Release struct {
 	Status        string     `json:"status"`
 	Description   string     `json:"description"`
 	Scheduler     string     `json:"scheduler"`
+	GitlabPRURL   string     `json:"gitlabPRURL"`
 	StartedAt     *time.Time `json:"startedAt,omitempty"`
 	CompletedAt   *time.Time `json:"completedAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`

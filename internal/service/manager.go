@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	cfg "github.com/felix-001/qnHackathon/internal/config"
 	"github.com/rs/zerolog/log"
 )
@@ -46,4 +48,23 @@ func (m *Manager) Run() {
 	//m.gitlabMgr.GetMergeRequest()
 	//m.gitlabMgr.CreateBranch("streamd")
 	//m.gitlabMgr.GetFile("streamd", "streamd.json")
+}
+
+func (m *Manager) Build(version string) (string, error) {
+	branch := m.gitlabMgr.CreateBranch("streamd")
+	if branch == "" {
+		log.Logger.Error().Msg("Failed to create branch")
+		return "", fmt.Errorf("failed to create branch")
+	}
+
+	m.gitlabMgr.UpdateVersion("streamd.json", version)
+	
+	success := m.gitlabMgr.CommitPush(branch, "Release "+version, "Automated release for version "+version)
+	if !success {
+		log.Logger.Error().Msg("Failed to create merge request")
+		return "", fmt.Errorf("failed to create merge request")
+	}
+
+	log.Logger.Info().Msgf("Created GitLab MR: %s", m.gitlabMgr.MrUrl)
+	return m.gitlabMgr.MrUrl, nil
 }
