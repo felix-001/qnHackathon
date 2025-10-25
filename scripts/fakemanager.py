@@ -20,6 +20,7 @@ bins = {
     },
 }
 node_bins = {}
+progress_data = {}
 
 
 @app.route("/api/v1/keepalive", methods=["GET", "POST"])
@@ -98,6 +99,46 @@ def bins_handler(bin_name):
         )
 
 
+@app.route("/api/v1/bins/<bin_name>/progress", methods=["POST"])
+def bin_progress(bin_name):
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "request body required"}), 400
+
+    node_name = data.get("nodeName")
+    target_hash = data.get("targetHash")
+    processing_time = data.get("processingTime")
+    status = data.get("status")
+
+    if not all([node_name, target_hash, status]):
+        return (
+            jsonify({"error": "nodeName, targetHash, and status are required"}),
+            400,
+        )
+
+    progress_key = f"{node_name}:{bin_name}:{target_hash}"
+    progress_data[progress_key] = {
+        "nodeName": node_name,
+        "binName": bin_name,
+        "targetHash": target_hash,
+        "processingTime": processing_time,
+        "status": status,
+        "updated_at": datetime.utcnow().isoformat(),
+    }
+
+    return (
+        jsonify(
+            {
+                "message": "progress recorded",
+                "nodeName": node_name,
+                "binName": bin_name,
+                "status": status,
+            }
+        ),
+        200,
+    )
+
+
 @app.route("/api/v1/download/<bin_file_name>", methods=["GET"])
 def download(bin_file_name):
     return (
@@ -130,6 +171,7 @@ if __name__ == "__main__":
     print("  POST /api/v1/keepalive")
     print("  GET  /api/v1/bins/<bin-name>")
     print("  POST /api/v1/bins/<bin-name>")
+    print("  POST /api/v1/bins/<bin-name>/progress")
     print("  GET  /api/v1/download/<bin-file-name>")
     print("  GET  /health")
     print("\nNote: Requires Flask (pip install flask)")
