@@ -5,13 +5,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"time"
 
 	cfg "github.com/felix-001/qnHackathon/internal/config"
-	"github.com/google/go-github/v48/github"
 	"github.com/rs/zerolog/log"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
@@ -69,56 +66,6 @@ func (s *GitLabMgr) CreateBranch(module string) string {
 	return branch
 }
 
-func (s *GitLabMgr) UpdateCsvFile(branch, filename, newTarName, message string) bool {
-	master := "master"
-
-	file, resp, err := s.Client.RepositoryFiles.GetFile(
-		s.Conf.ProjectID,
-		filename,
-		&gitlab.GetFileOptions{
-			Ref: &master,
-		})
-	if err != nil {
-		log.Logger.Err(err).Msgf("GetFile failed, branch: %s, %s, %s, %s", branch, filename, newTarName, message)
-		return false
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		log.Logger.Error().Msgf("GetFile resp.Status :%d", resp.StatusCode)
-		return false
-	}
-
-	// Base64 解码文件内容
-	decodedContent, err := base64.StdEncoding.DecodeString(file.Content)
-	if err != nil {
-		log.Logger.Error().Msgf("Failed to decode base64 content: %v", err)
-		return false
-	}
-	// 定义正则表达式匹配 MIKUD_LIVE 开头和 .tar.gz 结尾的文件名
-	re := regexp.MustCompile(`MIKUD_LIVE.*\.tar\.gz`)
-	OldTar := re.FindString(string(decodedContent))
-	if OldTar != "" {
-		s.OldTarName = OldTar
-	}
-
-	// 修改后的文件内容
-	updatedContent := re.ReplaceAllString(string(decodedContent), newTarName)
-
-	// 提交更改
-	_, _, err = s.Client.RepositoryFiles.UpdateFile(s.Conf.ProjectID,
-		filename,
-		&gitlab.UpdateFileOptions{
-			Branch:        &branch,
-			CommitMessage: &message,
-			Content:       &updatedContent,
-		})
-	if err != nil {
-		log.Logger.Error().Msgf("Failed to update file: %v", err)
-	}
-
-	return true
-}
-
 func (s *GitLabMgr) CommitPush(branch string, title, message string) bool {
 	master := "master"
 	options := &gitlab.CreateMergeRequestOptions{
@@ -137,19 +84,41 @@ func (s *GitLabMgr) CommitPush(branch string, title, message string) bool {
 	return true
 }
 
-func saveHTMLToFile(html string, filename string) error {
-	file, err := os.Create(filename)
+func GetNodeFromUser(client *gitlab.Client, projectID string, mrid int) string {
+	// 获取 Merge Request 的评论
+	notes, resp, err := client.Notes.ListMergeRequestNotes(projectID, mrid, &gitlab.ListMergeRequestNotesOptions{}, gitlab.WithContext(context.Background()))
 	if err != nil {
-		return err
+		log.Logger.Warn().Err(err).
+			Str("projectID", projectID).
+			Int("mrIID", mrid).
+			Msgf("Failed to get Merge Request notes: %v", err)
+		return ""
 	}
-	defer file.Close()
-
-	_, err = file.WriteString(html)
-	if err != nil {
-		return err
+	if resp.StatusCode != 200 {
+		log.Logger.Warn().Err(err).
+			Str("projectID", projectID).
+			Int("mrIID", mrid).
+			Msgf("Unexpected response status code: %d", resp.StatusCode)
+		return ""
 	}
 
-	return nil
+	// 写qiniu-bot的内容到mr
+	for _, note := range notes {
+		if note.Author.Username != "qiniu-bot" {
+			continue
+		}
+		if strings.Contains(note.Body, "issue:") {
+			// 提取 issue 链接
+			parts := strings.Split(note.Body, " ")
+			if len(parts) == 4 {
+				note := parts[1]
+				if strings.HasPrefix(note, "https://") {
+					return note
+				}
+			}
+		}
+	}
+	return ""
 }
 
 func (s *GitLabMgr) GetMergeRequest() map[string][]*gitlab.BasicMergeRequest {
@@ -207,7 +176,10 @@ func (s *GitLabMgr) GetMergeRequest() map[string][]*gitlab.BasicMergeRequest {
 
 		log.Logger.Info().
 			Str("key", girid).
+			Str("mrIID", fmt.Sprintf("%d", mr.IID)).
+			Str("id", fmt.Sprintf("%d", mr.ID)).
 			Str("title", mr.Title).
+			Str("webURL", mr.WebURL).
 			Str("author", mr.Author.Name).
 			Str("state", mr.State).
 			Str("createdAt", mr.CreatedAt.String()).
@@ -221,182 +193,68 @@ func (s *GitLabMgr) GetMergeRequest() map[string][]*gitlab.BasicMergeRequest {
 	return mergeRequestMap
 }
 
-func generateMergeRequestHTMLTable(mergeRequestMap map[string][]*gitlab.BasicMergeRequest, gitbubMap map[string]*github.PullRequest) string {
-	html := `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>MIKU GitLab Merge Requests</title>
-	<style>
-		body {
-			font-family: Arial, sans-serif;
-		}
-		table {
-			width: 100%;
-			border-collapse: collapse;
-			margin-top: 20px;
-		}
-		th, td {
-			border: 1px solid #ddd;
-			padding: 12px;
-			text-align: left;
-		}
-		th {
-			background-color: #4CAF50;
-			color: white;
-			cursor: pointer;
-		}
-		tr:nth-child(even) {
-			background-color: #f2f2f2;
-		}
-		tr:hover {
-			background-color: #ddd;
-		}
-		.fixed-header {
-			position: sticky;
-			top: 0;
-			z-index: 10;
-		}
-	</style>
-</head>
-<body>
-	<h1>GitLab Merge Requests</h1>
-`
+func (s *GitLabMgr) GetFile(branch, filename string) {
+	master := "master"
 
-	html += `
-		<table>
-			<thead class="fixed-header">
-				<tr>
-					<th onclick="sortTable(this, 0)">Title</th>
-					<th onclick="sortTable(this, 1)">Author</th>
-					<th onclick="sortTable(this, 2)">State</th>
-					<th onclick="sortTable(this, 3)">Created At</th>
-					<th onclick="sortTable(this, 4)">变更描述</th>
-				</tr>
-			</thead>
-			<tbody>
-		`
-	// 添加每个状态的表格
-	for key, mergeRequests := range mergeRequestMap {
-		for _, mr := range mergeRequests {
-			githubstr := "null"
-			githubMR, ok := gitbubMap[key]
-			if ok {
-				githubstr = *githubMR.DiffURL
-				// 去掉 .diff
-				if strings.Contains(githubstr, ".diff") {
-					githubstr = strings.Split(githubstr, ".diff")[0]
-				}
-			}
-
-			// 检查 Jira 是否为链接
-			jiraHTML := ""
-			if len(mr.Labels) > 0 {
-				if strings.HasPrefix(mr.Labels[0], "http://") || strings.HasPrefix(mr.Labels[0], "https://") {
-					jiraHTML = fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", mr.Labels[0], mr.Labels[0])
-				}
-			}
-
-			// 合并 Jira 和 GitLab 的信息
-			floyHTML := fmt.Sprintf(
-				"description: %s<br>jira: %s<br>floy:  %s<br>github:  %s<br>",
-				mr.Description,
-				jiraHTML, // Jira 链接
-				fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", mr.WebURL, mr.WebURL), // GitLab 链接
-				fmt.Sprintf("<a href=\"%s\" target=\"_blank\">%s</a>", githubstr, githubstr), // GitHub 链接，如果有的话
-			)
-
-			html += fmt.Sprintf(
-				"<tr>"+
-					"<td>%s</td>"+
-					"<td>%s</td>"+
-					"<td>%s</td>"+
-					"<td>%s</td>"+
-					"<td>%s</td>"+
-					"</tr>",
-				mr.Title,
-				mr.Author.Name,
-				mr.State,
-				mr.CreatedAt.Format(time.RFC3339),
-				floyHTML, // 合并后的 floy 列的内容
-			)
-		}
-
-	}
-	html += `
-			</tbody>
-		</table>
-		`
-
-	html += `
-	<script>
-		function sortTable(header, column) {
-			const table = header.closest("table");
-			const rows = Array.from(table.querySelectorAll("tbody tr"));
-			const isAscending = header.dataset.sortOrder !== "asc";
-			header.dataset.sortOrder = isAscending ? "asc" : "desc";
-
-			rows.sort((a, b) => {
-				const cellA = a.cells[column].textContent.trim();
-				const cellB = b.cells[column].textContent.trim();
-
-				if (isAscending) {
-					return cellA.localeCompare(cellB);
-				} else {
-					return cellB.localeCompare(cellA);
-				}
-			});
-
-			const tbody = table.querySelector("tbody");
-			rows.forEach(row => tbody.appendChild(row));
-		}
-	</script>
-</body>
-</html>
-`
-	return html
-}
-
-func GetNodeFromUser(client *gitlab.Client, projectID string, mrid int) string {
-	// 获取 Merge Request 的评论
-	notes, resp, err := client.Notes.ListMergeRequestNotes(projectID, mrid, &gitlab.ListMergeRequestNotesOptions{}, gitlab.WithContext(context.Background()))
+	file, resp, err := s.Client.RepositoryFiles.GetFile(
+		s.Conf.ProjectID,
+		filename,
+		&gitlab.GetFileOptions{
+			Ref: &master,
+		})
 	if err != nil {
-		log.Logger.Warn().Err(err).
-			Str("projectID", projectID).
-			Int("mrIID", mrid).
-			Msgf("Failed to get Merge Request notes: %v", err)
-		return ""
+		log.Logger.Err(err).Msgf("GetFile failed, branch: %s, %s, %s, %s", branch, filename)
+		return
 	}
-	if resp.StatusCode != 200 {
-		log.Logger.Warn().Err(err).
-			Str("projectID", projectID).
-			Int("mrIID", mrid).
-			Msgf("Unexpected response status code: %d", resp.StatusCode)
+
+	if resp.StatusCode != http.StatusOK {
+		log.Logger.Error().Msgf("GetFile resp.Status :%d", resp.StatusCode)
+		return
+	}
+
+	// Base64 解码文件内容
+	decodedContent, err := base64.StdEncoding.DecodeString(file.Content)
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to decode base64 content: %v", err)
+		return
+	}
+	log.Info().Msgf("GetFile content: %s", string(decodedContent))
+}
+
+func (s *GitLabMgr) UpdateVersion(filename, newVersion string) {
+	branch := s.CreateBranch("streamd")
+	updatedContent := fmt.Sprintf(`{"version": %s}`, newVersion)
+	// 提交更改
+	_, _, err := s.Client.RepositoryFiles.UpdateFile(s.Conf.ProjectID,
+		filename,
+		&gitlab.UpdateFileOptions{
+			Branch:        &branch,
+			CommitMessage: &newVersion,
+			Content:       &updatedContent,
+		})
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to update file: %v", err)
+	}
+
+	s.CommitPush(branch, newVersion, newVersion)
+}
+
+func (s *GitLabMgr) GetMrUrl(expectedTitle string) string {
+	// 获取所有 MR 分类 map
+	mrMap := s.GetMergeRequest()
+	if mrMap == nil {
+		log.Logger.Warn().Msg("GetMrUrl: 无法获取 MergeRequest 列表")
 		return ""
 	}
 
-	// 写qiniu-bot的内容到mr
-	for _, note := range notes {
-		if note.Author.Username != "qiniu-bot" {
-			continue
-		}
-		// “issue: https://jira.qiniu.io/browse/MIKU-1624 author: @liyuanquan”, 提取issue的链接
-		if strings.Contains(note.Body, "issue:") {
-			// 提取 issue 链接
-			parts := strings.Split(note.Body, " ")
-			if len(parts) == 4 {
-				note := parts[1]
-				if strings.HasPrefix(note, "https://") {
-					return note
-				}
+	// 遍历 map 中的所有 MR 列表
+	for _, mrList := range mrMap {
+		for _, mr := range mrList {
+			if mr.Title == expectedTitle {
+				return mr.WebURL
 			}
 		}
 	}
-	return ""
-}
 
-func GetModuleCvsFile(module string) string {
-	return fmt.Sprintf("floy/miku-%s/miku-%s.csv", module, module)
+	return ""
 }
