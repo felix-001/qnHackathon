@@ -9,6 +9,7 @@ type Project struct {
 	Description    string    `json:"description" bson:"description"`
 	Owner          string    `json:"owner" bson:"owner"`
 	RepositoryURL  string    `json:"repositoryUrl" bson:"repositoryUrl"`
+	GithubURL      string    `json:"githubUrl" bson:"githubUrl"`
 	BuildTool      string    `json:"buildTool" bson:"buildTool"`
 	DeploymentType string    `json:"deploymentType" bson:"deploymentType"`
 	Status         string    `json:"status" bson:"status"`
@@ -30,6 +31,7 @@ type Application struct {
 type Release struct {
 	ID            string     `json:"id" bson:"_id,omitempty"`
 	ProjectID     string     `json:"projectId" bson:"projectId"`
+	ProjectName   string     `json:"projectName" bson:"projectName"`
 	ApplicationID string     `json:"applicationId" bson:"applicationId"`
 	Version       string     `json:"version" bson:"version"`
 	Environment   string     `json:"environment" bson:"environment"`
@@ -37,6 +39,7 @@ type Release struct {
 	Status        string     `json:"status" bson:"status"`
 	Description   string     `json:"description" bson:"description"`
 	Scheduler     string     `json:"scheduler" bson:"scheduler"`
+	GitlabPRURL   string     `json:"gitlabPrUrl" bson:"gitlabPrUrl"`
 	StartedAt     *time.Time `json:"startedAt,omitempty" bson:"startedAt,omitempty"`
 	CompletedAt   *time.Time `json:"completedAt,omitempty" bson:"completedAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt" bson:"createdAt"`

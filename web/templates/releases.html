@@ -47,11 +47,13 @@
             <table>
                 <thead>
                     <tr>
+                        <th>项目名称</th>
                         <th>版本</th>
                         <th>环境</th>
                         <th>策略</th>
                         <th>状态</th>
                         <th>发布人</th>
+                        <th>GitLab PR</th>
                         <th>创建时间</th>
                         <th>操作</th>
                     </tr>
@@ -95,6 +97,10 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>GitLab PR链接</label>
+                    <input type="text" name="gitlabPrUrl">
+                </div>
+                <div class="form-group">
                     <label>描述</label>
                     <textarea name="description"></textarea>
                 </div>
@@ -130,11 +136,13 @@
                     const tbody = document.getElementById('releaseList');
                     tbody.innerHTML = (data.data || []).map(r => `
                         <tr>
+                            <td>${r.projectName || '-'}</td>
                             <td>${r.version}</td>
                             <td>${r.environment}</td>
                             <td>${r.strategy}</td>
                             <td>${getStatusTag(r.status)}</td>
                             <td>${r.scheduler}</td>
+                            <td>${r.gitlabPrUrl ? `<a href="${r.gitlabPrUrl}" target="_blank">查看PR</a>` : '-'}</td>
                             <td>${new Date(r.createdAt).toLocaleString()}</td>
                             <td>
                                 ${r.status === 'completed' ? `<button class="btn btn-danger" onclick="rollback('${r.id}')">回滚</button>` : ''}
