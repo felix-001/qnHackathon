@@ -178,13 +178,13 @@ kill_old_downloads() {
 
 post_update_status() {
     local bin_name="$1"
-    local new_md5="$2"
+    local new_sha256="$2"
 
     local node_name
     node_name=$(hostname)
 
     local payload
-    payload="{\"nodeName\":\"$node_name\",\"binName\":\"$bin_name\",\"sha256\":\"$new_md5\",\"version\":\"latest\"}"
+    payload="{\"nodeName\":\"$node_name\",\"binName\":\"$bin_name\",\"sha256\":\"$new_sha256\",\"version\":\"latest\"}"
 
     if curl -s -X POST -H "Content-Type: application/json" \
         -d "$payload" \
@@ -232,17 +232,11 @@ query_latest_sha256() {
 
     # Validate JSON response
     if ! echo "$response" | jq -e '.sha256' > /dev/null 2>&1; then
-        # Try md5 field for backward compatibility, but warn
-        if echo "$response" | jq -e '.md5' > /dev/null 2>&1; then
-            log "WARNING: API returned md5 instead of sha256 for $bin_name"
-            echo "$response" | jq -r '.md5'
-        else
-            error "Invalid API response format for $bin_name"
-            return 1
-        fi
-    else
-        echo "$response" | jq -r '.sha256'
+        error "Invalid API response format for $bin_name (sha256 field missing)"
+        return 1
     fi
+    
+    echo "$response" | jq -r '.sha256'
 }
 
 download_binary() {
@@ -469,7 +463,7 @@ main() {
     keepalive_check
 
     local binaries
-    binaries=$(jq -r '.binaries[] | "\(.name):\(.currentSha256 // .currentMd5 // "")"' "$BIN_MANIFESTS")
+    binaries=$(jq -r '.binaries[] | "\(.name):\(.currentSha256 // "")"' "$BIN_MANIFESTS")
 
     while IFS=: read -r bin_name current_sha256; do
         if [[ -n "$bin_name" ]]; then
