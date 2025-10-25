@@ -309,9 +309,7 @@ func (s *JenkinsMgr) GetBuildStatus(buildid int64) (isbuilding bool, buildmoreIn
 				}
 			}
 		}
-		if buildResult.TarFileName != "" && buildResult.README != "" {
-			buildResult.IsSuccess = true
-		}
+		buildResult.IsSuccess = true
 
 		log.Logger.Info().Msgf("Jenkins 构建 ID: %d, URL: %s, 状态: %t, 结果: %s, Building: %t, tar: %s, readme: %s",
 			buildtask.GetBuildNumber(), buildtask.GetUrl(), buildtask.IsGood(ctx), result,
@@ -379,42 +377,43 @@ func (s *JenkinsMgr) WaitForJobCompletion() *BuildResult {
 	}
 
 	startTime := time.Now()
-	ticker := time.NewTicker(30 * time.Second)
+	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			lastBuild, err := job.GetLastBuild(ctx)
-			if err != nil {
-				log.Logger.Error().Err(err).Msg("Failed to get last build")
-				continue
-			}
+	for range ticker.C {
+		lastBuild, err := job.GetLastBuild(ctx)
+		if err != nil {
+			log.Logger.Error().Err(err).Msg("Failed to get last build")
+			continue
+		}
 
-			if lastBuild.IsRunning(ctx) {
-				log.Logger.Info().Msgf("Build %d is still running...", lastBuild.GetBuildNumber())
-			} else {
-				isBuilding, buildResult := s.GetBuildStatus(lastBuild.Raw.QueueID)
-				if !isBuilding && buildResult != nil && buildResult.IsFinished {
-					if buildResult.IsSuccess {
-						log.Logger.Info().Msgf("Build completed successfully: %d", buildResult.BuildID)
-						return buildResult
-					}
-					log.Logger.Error().Msgf("Build failed: %v", buildResult.BuildError)
+		if lastBuild.IsRunning(ctx) {
+			log.Logger.Info().Msgf("Build %d is still running...", lastBuild.GetBuildNumber())
+		} else {
+			isBuilding, buildResult := s.GetBuildStatus(lastBuild.Raw.QueueID)
+			if !isBuilding && buildResult != nil && buildResult.IsFinished {
+				if buildResult.IsSuccess {
+					log.Logger.Info().Msgf("Build completed successfully: %d", buildResult.BuildID)
 					return buildResult
 				}
+				log.Logger.Error().Msgf("Build failed: %v", buildResult.BuildError)
+				return buildResult
+			} else {
+				log.Logger.Info().Bool("isBuilding", isBuilding).Any("buildResult", buildResult).Msg("WaitForJobCompletion")
 			}
+		}
 
-			if time.Since(startTime) > 3*time.Hour {
-				log.Logger.Error().Msg("Build timeout after 3 hours")
-				return &BuildResult{
-					IsFinished: true,
-					IsSuccess:  false,
-					Result:     "timeout",
-				}
+		if time.Since(startTime) > 3*time.Hour {
+			log.Logger.Error().Msg("Build timeout after 3 hours")
+			return &BuildResult{
+				IsFinished: true,
+				IsSuccess:  false,
+				Result:     "timeout",
 			}
 		}
 	}
+
+	return nil
 }
 
 func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
@@ -424,7 +423,7 @@ func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
 
 	ctx := context.Background()
 	artifacts := buildResult.Build.GetArtifacts()
-	
+
 	for _, artifact := range artifacts {
 		if artifact.FileName == "streamd" {
 			downloadDir := "./downloads"
@@ -435,12 +434,12 @@ func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
 			if !success {
 				return "", fmt.Errorf("failed to save artifact: unknown error")
 			}
-			
+
 			downloadPath := fmt.Sprintf("%s/%s", downloadDir, artifact.FileName)
 			log.Logger.Info().Msgf("Successfully downloaded streamd to: %s", downloadPath)
 			return downloadPath, nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("streamd artifact not found in build")
 }
