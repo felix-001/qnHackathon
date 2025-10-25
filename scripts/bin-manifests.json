@@ -1,18 +1,25 @@
 {
   "binaries": [
     {
-      "serviceName": "manager",
-      "binaryName": "manager",
+      "serviceName": "bin1",
+      "binaryName": "bin1",
       "version": "",
       "previousVersion": "",
       "port": 8080
     },
     {
-      "serviceName": "example-service",
-      "binaryName": "example-service",
+      "serviceName": "bin2",
+      "binaryName": "bin2",
       "version": "",
       "previousVersion": "",
       "port": 9090
+    },
+    {
+      "serviceName": "bin3",
+      "binaryName": "bin3",
+      "version": "",
+      "previousVersion": "",
+      "port": 9091
     }
   ],
   "nodeInfo": {
