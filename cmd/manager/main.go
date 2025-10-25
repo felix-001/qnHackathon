@@ -69,6 +69,7 @@ func main() {
 
 		api.GET("/releases", releaseHandler.List)
 		api.POST("/releases", releaseHandler.Create)
+		api.POST("/releases/batch-delete", releaseHandler.BatchDelete)
 		api.GET("/releases/:id", releaseHandler.Get)
 		api.POST("/releases/:id/rollback", releaseHandler.Rollback)
 		api.POST("/releases/:id/approve", releaseHandler.Approve)
