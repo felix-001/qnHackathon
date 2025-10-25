@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"log"
+	"os"
 
 	cfg "github.com/felix-001/qnHackathon/internal/config"
 
@@ -10,20 +12,22 @@ import (
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	qconfig "github.com/qiniu/x/config"
-)
-
-var (
-	// configFile 配置文件
-	configFile = flag.String("f", "./config/manager.json", "the config file")
+	//qconfig "github.com/qiniu/x/config"
 )
 
 func main() {
+	configFile := flag.String("f", "./config/manager.json", "the config file")
 	flag.Parse()
 	cfg := &cfg.Config{}
-	err := qconfig.LoadFile(cfg, *configFile)
+	bytes, err := os.ReadFile(*configFile)
 	if err != nil {
-		log.Fatalf("加载配置文件失败: %v", err)
+		log.Println("read fail", *configFile, err)
+		return
+	}
+	err = json.Unmarshal(bytes, cfg)
+	if err != nil {
+		log.Println("unmarshal fail", *configFile, err)
+		return
 	}
 	mgr := service.NewManager(cfg)
 	mgr.Run()
