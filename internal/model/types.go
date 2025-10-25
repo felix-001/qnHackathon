@@ -40,6 +40,7 @@ type Release struct {
 	Description   string     `json:"description" bson:"description"`
 	Scheduler     string     `json:"scheduler" bson:"scheduler"`
 	GitlabPRURL   string     `json:"gitlabPrUrl" bson:"gitlabPrUrl"`
+	TarFileName   string     `json:"tarFileName" bson:"tarFileName"`
 	StartedAt     *time.Time `json:"startedAt,omitempty" bson:"startedAt,omitempty"`
 	CompletedAt   *time.Time `json:"completedAt,omitempty" bson:"completedAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt" bson:"createdAt"`

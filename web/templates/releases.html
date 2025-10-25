@@ -55,6 +55,7 @@
                         <th>策略</th>
                         <th>状态</th>
                         <th>发布人</th>
+                        <th>构建包</th>
                         <th>GitLab PR</th>
                         <th>创建时间</th>
                         <th>操作</th>
@@ -167,6 +168,7 @@
                             <td>${r.strategy}</td>
                             <td>${getStatusTag(r.status)}</td>
                             <td>${r.scheduler}</td>
+                            <td>${r.tarFileName || '构建中...'}</td>
                             <td>${r.gitlabPrUrl ? `<a href="${r.gitlabPrUrl}" target="_blank">查看PR</a>` : '构建中...'}</td>
                             <td>${new Date(r.createdAt).toLocaleString()}</td>
                             <td>${getActionButton(r)}</td>

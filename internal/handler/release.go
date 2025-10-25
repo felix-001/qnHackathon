@@ -48,9 +48,14 @@ func (h *ReleaseHandler) Create(c *gin.Context) {
 	}
 
 	go func() {
-		gitlabPrUrl := h.manager.Build()
-		if gitlabPrUrl != "" {
-			h.service.UpdateGitlabPR(release.ID, gitlabPrUrl)
+		buildInfo := h.manager.Build()
+		if buildInfo != nil {
+			if buildInfo.GitlabPRURL != "" {
+				h.service.UpdateGitlabPR(release.ID, buildInfo.GitlabPRURL)
+			}
+			if buildInfo.TarFileName != "" {
+				h.service.UpdateTarFileName(release.ID, buildInfo.TarFileName)
+			}
 		}
 	}()
 
