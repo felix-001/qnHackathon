@@ -1,0 +1,23 @@
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y supervisor nginx python3-flask curl && rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /usr/share/nginx/html/files
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
+# 复制应用代码到容器
+COPY bins/mybin1.py /app/v1/mybin1
+COPY bins/mybin2.py /app/v1/mybin2
+COPY bins/mybin3.py /app/v1/mybin3
+# latest bins 下载目录，供 binproxy 下载
+COPY bins/latest/mybin1.py /usr/share/nginx/html/files/mybin1
+COPY bins/latest/mybin2.py /usr/share/nginx/html/files/mybin2
+COPY bins/latest/mybin3.py /usr/share/nginx/html/files/mybin3
+
+# 复制 supervisord 配置文件
+COPY supervisor/supervisord.conf /etc/supervisor/supervisord.conf
+
+# 暴露端口（根据需要: 8090 nginx）
+EXPOSE 8090
+
+# 启动 supervisord（前台运行）
+CMD ["supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]

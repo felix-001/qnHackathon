@@ -15,7 +15,11 @@ build-manager:
 build-proxy:
 	docker build -f Dockerfile.binproxy -t binproxy:latest .
 
-build-all: build-manager build-proxy
+build-supervisor:
+    cd scripts/tests && \
+	docker build -f Dockerfile.supervisor -t supervisor:latest .
+
+build-all: build-manager build-proxy build-supervisor
 
 run-manager:
 	docker run -p 8081:8081 bin-manager:latest
@@ -23,5 +27,8 @@ run-manager:
 run-proxy:
 	docker run --name binproxy --net=host -d binproxy:latest
 
+run-supervisor:
+	docker run --name supervisor --net=host -d supervisor:latest
+
 clean:
-	docker rmi bin-manager:latest binproxy:latest
+	docker rmi bin-manager:latest binproxy:latest supervisor:latest
