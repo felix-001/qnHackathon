@@ -47,6 +47,7 @@
             <table>
                 <thead>
                     <tr>
+                        <th>项目名称</th>
                         <th>版本</th>
                         <th>环境</th>
                         <th>策略</th>
@@ -130,6 +131,7 @@
                     const tbody = document.getElementById('releaseList');
                     tbody.innerHTML = (data.data || []).map(r => `
                         <tr>
+                            <td>ID: ${r.projectId}</td>
                             <td>${r.version}</td>
                             <td>${r.environment}</td>
                             <td>${r.strategy}</td>
