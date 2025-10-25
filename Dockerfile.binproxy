@@ -1,0 +1,31 @@
+FROM alpine:latest
+
+# 安装系统依赖
+RUN apk --no-cache add \
+    bash \
+    curl \
+    jq \
+    supervisor \
+    coreutils \
+    python3 \
+    py3-pip \
+    py3-uv
+
+WORKDIR /app
+
+COPY scripts/requirements.txt /app/requirements.txt
+# 安装 Python 依赖时也需要添加 --break-system-packages
+RUN uv pip install --system --break-system-packages -r /app/requirements.txt
+
+COPY scripts/binproxy.py /app/binproxy
+COPY scripts/fakemanager.py /app/fakemanager
+COPY scripts/bin-inspector.sh /app/bin-inspector
+COPY scripts/bin-manifests.json /app/bin-manifests.json
+
+RUN chmod +x /app/fakemanager /app/binproxy /app/bin-inspector
+
+# 配置定时任务
+RUN echo '* * * * * /app/binproxy >> /app/binproxy.log 2>&1' > /etc/crontabs/root && \
+    echo '* * * * * /app/bin-inspector >> /app/bin-inspector.log 2>&1' >> /etc/crontabs/root
+
+CMD ["crond", "-f", "-l", "2"]

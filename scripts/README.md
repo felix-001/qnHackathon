@@ -2,6 +2,50 @@
 
 bin-proxy 是一个用于自动维护和更新宿主机二进制文件的工具。
 
+## 需求
+
+bin-proxy 功能实现：
+
+bin-proxy 维护宿主机，以 shell 脚本实现，基于 crontab 每分钟执行一次
+bin-proxy 和 bin-manager api 交互：获取最新的 bin 二进制 sha256sum 值
+bin-proxy 基于一份 bin manifests 维护自己需要升级服务的二进制 bin 文件列表：叫做 bin-manifests
+bin-manifests 包括：二进制 bin 名字，版本统一为 lastet，以及当前在运行的 bin sha256sum 值
+bin-proxy 会读取 bin-manifests，然后向 bin-manager api 查询最新版本的 sha256sum 值，如果不同则进行升级步骤
+版本变更步骤：替代本地 bin 文件，执行 supervisor 重启 bin 名字对应的服务
+
+bin-manager API
+/api/v1/keepalive： bin-proxy 使用该接口 get 自己的 node 信息，如果没有 post 上报自己的信息
+/api/v1/bins/: get 最新的 hash 值
+/api/v1/bins/: 升级后 post 自己最新的 hash 值，让 api 直到当前 node 使用的是最新的版本
+/api/v1/download: 各种 bin 的下载路径 wget /api/v1/download/ 即可下载，该路径可以独立：bin-proxy 支持修改
+
+bin-manifests 使用 yaml 格式，需要包含如下信息：
+各种服务的 bin 所有历史变更信息：
+bin 名
+版本信息用 sha256sum 表示， sha256sum 作为键，值存储升级的结果：
+“”： 空表示，未升级
+“ok”：已升级
+“err”：升级失败，已回滚
+升级路径：升级后的 sha256sum ： 升级前的 sha256sum
+当前 node 信息：
+cpu 架构
+系统 release 版本
+node 名
+bin-proxy 的版本（同时维护到 bin-proxy 中）
+
+升级流程
+如果发现某个服务的 bin 文件的最新版本的 sha256sum 和当前 bin-manifests 中的 bin 不同，则执行升级
+
+回滚流程
+需要额外实现一个巡检脚本：该脚本会检查服务的运行状况：
+-- 服务是否 running： ps 等工具
+-- 服务接口是否可访问：nc 等工具
+-- 监控接口是否有该服务的告警： Prometheus 查询接口
+
+如果巡检脚本查询到某个服务有问题，则必须执行服务回滚。
+回滚要求所有的服务的二进制都必须存储在宿主机上。
+回滚时，按照回滚路径直接定位到当前版本的上一个版本的 bin 二进制，直接执行版本变更步骤即可
+
 ## 功能特性
 
 1. 基于 crontab 定时执行（每分钟一次）
@@ -180,6 +224,7 @@ bin-proxy 需要 bin-manager 提供以下 API 接口：
 ### 1. Keepalive 接口
 
 **检查节点状态**
+
 ```
 GET /api/v1/keepalive
 
@@ -195,6 +240,7 @@ Response:
 ```
 
 **注册/更新节点信息**
+
 ```
 POST /api/v1/keepalive
 Content-Type: application/json
@@ -217,6 +263,7 @@ Response:
 ### 2. 二进制信息接口
 
 **获取最新版本 SHA-256**
+
 ```
 GET /api/v1/bins/{bin_name}
 
@@ -232,6 +279,7 @@ Response:
 ```
 
 **上报更新后的版本信息**
+
 ```
 POST /api/v1/bins/{bin_name}
 Content-Type: application/json
@@ -254,6 +302,7 @@ Response:
 ### 3. 进度上报接口
 
 **上报任务处理进度**
+
 ```
 POST /api/v1/bins/{bin_name}/progress
 Content-Type: application/json
@@ -275,6 +324,7 @@ Response:
 ```
 
 说明：
+
 - `targetHash`: 目标版本的 SHA-256 哈希值，用于标识正在处理的具体版本
 - `processingTime`: 从获取锁开始到当前的处理时间（秒）
 - `status`: 任务状态
@@ -285,6 +335,7 @@ Response:
 ### 4. 下载接口
 
 **下载二进制文件**
+
 ```
 GET /api/v1/download/{bin_name}
 
@@ -292,6 +343,7 @@ Response: 二进制文件流
 ```
 
 **备用下载接口**
+
 ```
 GET /api/v1/releases/latest/{bin_name}/download
 
@@ -309,29 +361,29 @@ Response: 二进制文件流
 2. **处理每个二进制文件**
    - 读取 bin-manifests.json 获取需要管理的二进制列表
    - 对每个二进制文件：
-     
+
      a. **获取锁**
         - 尝试获取该二进制的文件锁
         - 如果锁已存在且未超时（10分钟），跳过处理
         - 如果锁已超时，清理旧锁并继续
-     
+
      b. **版本检查**
         - 调用 API 获取最新版本的 SHA-256 值
         - 与当前运行版本的 SHA-256 对比
         - 如果相同，释放锁并跳过
-     
+
      c. **下载更新**（如果需要）
         - 清理该二进制的旧下载进程（避免并发下载冲突）
         - 上报处理进度（in_progress 状态）
         - 下载新版本二进制文件
         - 验证下载文件的 SHA-256
-     
+
      d. **应用更新**
         - 备份当前版本
         - 替换二进制文件
         - 通过 supervisor 重启服务
         - 如果重启失败，自动回滚到备份版本
-     
+
      e. **上报结果**
         - 上报任务完成状态和处理时间（success/failed）
         - 向 API POST 更新后的版本信息
@@ -379,11 +431,13 @@ ls -la /var/run/bin-proxy/
 ```
 
 查看锁文件内容（Unix 时间戳）：
+
 ```bash
 cat /var/run/bin-proxy/manager-abc123def456.lock
 ```
 
 手动清理锁文件（如果需要）：
+
 ```bash
 sudo rm /var/run/bin-proxy/*.lock
 ```
