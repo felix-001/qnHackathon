@@ -12,6 +12,7 @@ import shutil
 import logging
 import fcntl
 import tempfile
+import re
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 from pathlib import Path
@@ -53,6 +54,21 @@ def error(message: str):
     logger.error(f"ERROR: {message}")
 
 
+def validate_bin_name(bin_name: str) -> bool:
+    if not bin_name or not re.match(r'^[a-zA-Z0-9_-]+$', bin_name):
+        error(f"Invalid binary name: {bin_name}")
+        return False
+    return True
+
+
+def validate_path_traversal(bin_name: str, base_dir: str) -> bool:
+    bin_path = (Path(base_dir) / bin_name).resolve()
+    if not str(bin_path).startswith(str(Path(base_dir).resolve())):
+        error(f"Path traversal attempt detected: {bin_name}")
+        return False
+    return True
+
+
 def get_node_info() -> Dict[str, str]:
     cpu_arch = platform.machine()
 
@@ -87,24 +103,29 @@ def keepalive_check():
             f"{BIN_MANAGER_API}/keepalive",
             params={"node_id": node_id},
             timeout=10,
+            verify=True,
         )
         if response.status_code != 200:
             raise Exception("Not registered")
         log("Keepalive check successful")
-    except Exception:
-        log("Node not registered, posting node info")
+    except Exception as e:
+        log(f"Node not registered, posting node info: {e}")
         try:
             requests.post(
                 f"{BIN_MANAGER_API}/keepalive",
                 json=node_info,
                 headers={"Content-Type": "application/json"},
                 timeout=10,
+                verify=True,
             )
         except Exception as e:
             error(f"Failed to post keepalive: {e}")
 
 
 def acquire_lock(bin_name: str, bin_hash: str) -> bool:
+    if not validate_bin_name(bin_name):
+        return False
+    
     lock_file = Path(LOCK_DIR) / f"{bin_name}-{bin_hash}.lock"
 
     old_locks = list(Path(LOCK_DIR).glob(f"{bin_name}-*.lock"))
@@ -181,9 +202,10 @@ def report_progress(bin_name: str, bin_hash: str):
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=10,
+            verify=True,
         )
-    except Exception:
-        pass
+    except Exception as e:
+        error(f"Failed to report progress for {bin_name}: {e}")
 
 
 def report_completion(bin_name: str, bin_hash: str, status: str):
@@ -212,6 +234,7 @@ def report_completion(bin_name: str, bin_hash: str, status: str):
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=10,
+            verify=True,
         )
 
         log(
@@ -222,6 +245,9 @@ def report_completion(bin_name: str, bin_hash: str, status: str):
 
 
 def kill_old_downloads(bin_name: str):
+    if not validate_bin_name(bin_name):
+        return
+    
     try:
         result = subprocess.run(
             ["pgrep", "-f", f"curl.*{DOWNLOAD_BASE_URL}/{bin_name}$"],
@@ -238,13 +264,16 @@ def kill_old_downloads(bin_name: str):
                 for pid in pids:
                     try:
                         subprocess.run(["kill", "-9", pid], check=False)
-                    except Exception:
-                        pass
-    except Exception:
-        pass
+                    except Exception as e:
+                        error(f"Failed to kill process {pid}: {e}")
+    except Exception as e:
+        error(f"Failed to kill old downloads: {e}")
 
 
 def post_update_status(bin_name: str, new_sha256: str) -> bool:
+    if not validate_bin_name(bin_name):
+        return False
+    
     node_id = socket.gethostname()
 
     payload = {
@@ -258,6 +287,7 @@ def post_update_status(bin_name: str, new_sha256: str) -> bool:
             json=payload,
             headers={"Content-Type": "application/json"},
             timeout=10,
+            verify=True,
         )
         if response.status_code in (200, 201):
             log(f"Posted update status for {bin_name} to API")
@@ -291,11 +321,14 @@ def query_latest_sha256(bin_name: str) -> Optional[str]:
     if not bin_name:
         error("bin_name is required for query_latest_sha256")
         return None
+    
+    if not validate_bin_name(bin_name):
+        return None
 
     url = f"{BIN_MANAGER_API}/bins/{bin_name}"
 
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, timeout=10, verify=True)
         if response.status_code == 200:
             data = response.json()
             if "sha256sum" in data:
@@ -314,6 +347,9 @@ def download_binary(bin_name: str, temp_file: str) -> bool:
     if not bin_name or not temp_file:
         error("bin_name and temp_file are required for download_binary")
         return False
+    
+    if not validate_bin_name(bin_name):
+        return False
 
     required_space = 102400
     stat = shutil.disk_usage("/tmp")
@@ -329,7 +365,7 @@ def download_binary(bin_name: str, temp_file: str) -> bool:
     log(f"Downloading {bin_name} from {url}")
 
     try:
-        response = requests.get(url, timeout=DOWNLOAD_TIMEOUT, stream=True)
+        response = requests.get(url, timeout=DOWNLOAD_TIMEOUT, stream=True, verify=True)
         if response.status_code == 200:
             with open(temp_file, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -348,6 +384,13 @@ def _validate_change_version_params(bin_name: str, target_sha256: str) -> bool:
     if not bin_name or not target_sha256:
         error("bin_name and target_sha256 are required for change_version")
         return False
+    
+    if not validate_bin_name(bin_name):
+        return False
+    
+    if not validate_path_traversal(bin_name, BIN_DIR):
+        return False
+    
     return True
 
 
@@ -653,6 +696,9 @@ def update_manifest(bin_name: str, new_sha256: str):
 def process_binary(bin_name: str, current_sha256: str) -> bool:
     if not bin_name:
         error("bin_name is required for process_binary")
+        return False
+    
+    if not validate_bin_name(bin_name):
         return False
 
     log(f"Processing binary: {bin_name}")
