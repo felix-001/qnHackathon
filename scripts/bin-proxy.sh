@@ -434,7 +434,7 @@ record_version_change() {
            --arg op "$operation" \
            --arg res "$result" \
            --arg ts "$timestamp" '
-            (.binaries[] | select(.name == $name)) |= (
+            (.binaries[] | select(.binaryName == $name)) |= (
                 .currentSha256 = $to |
                 .versionHistory //= [] |
                 .versionHistory += [{
@@ -443,7 +443,15 @@ record_version_change() {
                     "operation": $op,
                     "result": $res,
                     "timestamp": $ts
-                }]
+                }] |
+                .versions //= {} |
+                if $to != "" then
+                    .versions[$to] = {
+                        "status": (if $res == "success" then "ok" elif $res == "failed" then "err" else "" end),
+                        "upgradePath": $from,
+                        "timestamp": $ts
+                    }
+                else . end
             )' "$BIN_MANIFESTS" > "$temp_file"
         mv "$temp_file" "$BIN_MANIFESTS"
         log "Recorded version change: $bin_name ($operation: $from_sha256 -> $to_sha256, result: $result)"
@@ -498,7 +506,7 @@ update_manifest() {
     if command -v jq &> /dev/null; then
         local temp_file="/tmp/bin-manifests.tmp.$$"
         jq --arg name "$bin_name" --arg sha256 "$new_sha256" \
-            '(.binaries[] | select(.name == $name) | .currentSha256) = $sha256' \
+            '(.binaries[] | select(.binaryName == $name) | .currentSha256) = $sha256' \
             "$BIN_MANIFESTS" > "$temp_file"
         mv "$temp_file" "$BIN_MANIFESTS"
     else
@@ -575,7 +583,7 @@ main() {
     keepalive_check
 
     local binaries
-    binaries=$(jq -r '.binaries[] | "\(.name):\(.currentSha256 // "")"' "$BIN_MANIFESTS")
+    binaries=$(jq -r '.binaries[] | "\(.binaryName):\(.currentSha256 // "")"' "$BIN_MANIFESTS")
 
     while IFS=: read -r bin_name current_sha256; do
         if [[ -n "$bin_name" ]]; then

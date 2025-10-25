@@ -146,7 +146,7 @@ get_previous_version() {
     if command -v jq &> /dev/null; then
         local history
         history=$(jq -r --arg name "$bin_name" \
-            '.binaries[] | select(.name == $name) | .versionHistory // []' \
+            '.binaries[] | select(.binaryName == $name) | .versionHistory // []' \
             "$BIN_MANIFESTS" 2>/dev/null)
 
         if [[ -z "$history" ]] || [[ "$history" == "[]" ]]; then
@@ -264,7 +264,7 @@ main() {
     fi
 
     local services
-    services=$(jq -r '.binaries[] | "\(.name):\(.port // "")"' "$BIN_MANIFESTS" 2>/dev/null)
+    services=$(jq -r '.binaries[] | "\(.binaryName):\(.port // "")"' "$BIN_MANIFESTS" 2>/dev/null)
 
     if [[ -z "$services" ]]; then
         error "No services found in manifests"

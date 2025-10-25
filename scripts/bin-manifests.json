@@ -1,18 +1,22 @@
 {
   "binaries": [
     {
-      "name": "manager",
+      "serviceName": "manager",
+      "binaryName": "manager",
       "version": "latest",
       "currentSha256": "",
       "port": 8080,
-      "versionHistory": []
+      "versionHistory": [],
+      "versions": {}
     },
     {
-      "name": "example-service",
+      "serviceName": "example-service",
+      "binaryName": "example-service",
       "version": "latest",
       "currentSha256": "",
       "port": 9090,
-      "versionHistory": []
+      "versionHistory": [],
+      "versions": {}
     }
   ],
   "nodeInfo": {
