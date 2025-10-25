@@ -21,7 +21,7 @@ run-manager:
 	docker run -p 8081:8081 bin-manager:latest
 
 run-proxy:
-
+	docker run --name binproxy --net=host -d binproxy:latest
 
 clean:
 	docker rmi bin-manager:latest binproxy:latest

@@ -17,6 +17,7 @@ bin-manager API
 /api/v1/keepalive： bin-proxy 使用该接口 get 自己的 node 信息，如果没有 post 上报自己的信息
 /api/v1/bins/: get 最新的 hash 值
 /api/v1/bins/: 升级后 post 自己最新的 hash 值，让 api 直到当前 node 使用的是最新的版本
+/api/v1/bins/{bin_name}/progress: node 上的 binproxy 上报当前任务的处理进度
 /api/v1/download: 各种 bin 的下载路径 wget /api/v1/download/ 即可下载，该路径可以独立：bin-proxy 支持修改
 
 bin-manifests 使用 yaml 格式，需要包含如下信息：
