@@ -23,4 +23,5 @@ type Config struct {
 	GitHubConf  GitHubConf  `json:"githubConf"`
 	GitlabConf  GitlabConf  `json:"gitlabConf"`
 	JenkinsConf JenkinsConf `json:"jenkinsConf"`
+	BinDir      string      `json:"binDir"`
 }

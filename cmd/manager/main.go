@@ -36,10 +36,12 @@ func main() {
 	projectService := service.NewProjectService()
 	releaseService := service.NewReleaseService()
 	monitoringService := service.NewMonitoringService()
+	binaryService := service.NewBinaryService(cfg.BinDir)
 
 	projectHandler := handler.NewProjectHandler(projectService)
 	releaseHandler := handler.NewReleaseHandler(releaseService)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
+	binaryHandler := handler.NewBinaryHandler(binaryService)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)
@@ -61,6 +63,12 @@ func main() {
 		api.POST("/releases/:id/rollback", releaseHandler.Rollback)
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
+
+		api.GET("/keepalive", binaryHandler.Keepalive)
+		api.POST("/keepalive", binaryHandler.Keepalive)
+		api.GET("/bins/:name", binaryHandler.GetBinaryHash)
+		api.POST("/bins/:name", binaryHandler.UpdateBinaryHash)
+		api.GET("/download/:name", binaryHandler.DownloadBinary)
 	}
 
 	r.Run(":8081")

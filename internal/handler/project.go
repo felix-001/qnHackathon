@@ -9,7 +9,7 @@ import (
 )
 
 type ProjectHandler struct {
-	service *service.ProjectService 
+	service *service.ProjectService
 }
 
 func NewProjectHandler(service *service.ProjectService) *ProjectHandler {

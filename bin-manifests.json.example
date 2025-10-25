@@ -1,0 +1,22 @@
+{
+  "node": {
+    "name": "node-hostname",
+    "cpuArch": "x86_64",
+    "osRelease": "Ubuntu 20.04.6 LTS",
+    "proxyVersion": "1.0.0"
+  },
+  "binaries": [
+    {
+      "name": "example-service",
+      "version": "latest",
+      "hash": "",
+      "path": "/usr/local/bin/example-service"
+    },
+    {
+      "name": "another-service",
+      "version": "latest",
+      "hash": "",
+      "path": "/usr/local/bin/another-service"
+    }
+  ]
+}

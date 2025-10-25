@@ -62,3 +62,19 @@ type Response struct {
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
+
+type BinaryInfo struct {
+	Name      string    `json:"name"`
+	Version   string    `json:"version"`
+	Hash      string    `json:"hash"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type NodeInfo struct {
+	Name         string       `json:"name"`
+	CPUArch      string       `json:"cpuArch"`
+	OSRelease    string       `json:"osRelease"`
+	ProxyVersion string       `json:"proxyVersion"`
+	Binaries     []BinaryInfo `json:"binaries"`
+	LastSeen     time.Time    `json:"lastSeen"`
+}

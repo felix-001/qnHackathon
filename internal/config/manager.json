@@ -4,5 +4,6 @@
 		"username":"admin",
 		"url": "http://101.133.131.188:38010",
 		"projectID":"streamd"
-	}
+	},
+	"binDir": "./bins"
 }

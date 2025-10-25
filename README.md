@@ -42,6 +42,14 @@
 - 多环境配置管理
 - 配置增删改查
 
+### 5. 二进制管理 (bin-proxy)
+- 自动化二进制文件版本管理
+- 基于 MD5 hash 的版本检测
+- 自动下载和升级二进制文件
+- 节点信息自动注册和上报
+- 通过 supervisor 自动重启服务
+- 详细文档见 [bin-proxy-README.md](bin-proxy-README.md)
+
 ## 技术栈
 
 - **语言**: Go 1.21
@@ -67,15 +75,27 @@ go run cmd/manager/main.go
 
 ### API端点
 
+**项目管理**
 - `GET /api/v1/projects` - 获取项目列表
 - `POST /api/v1/projects` - 创建项目
 - `PUT /api/v1/projects/:id` - 更新项目
 - `DELETE /api/v1/projects/:id` - 删除项目
+
+**发布管理**
 - `GET /api/v1/releases` - 获取发布列表
 - `POST /api/v1/releases` - 创建发布
 - `GET /api/v1/releases/:id` - 获取发布详情
 - `POST /api/v1/releases/:id/rollback` - 回滚发布
+
+**监控**
 - `GET /api/v1/monitoring/realtime` - 获取实时监控数据
+
+**二进制管理 (bin-proxy)**
+- `GET /api/v1/keepalive?node=<name>` - 节点心跳查询
+- `POST /api/v1/keepalive?node=<name>` - 节点注册
+- `GET /api/v1/bins/:name` - 获取二进制文件 hash
+- `POST /api/v1/bins/:name` - 更新二进制文件 hash
+- `GET /api/v1/download/:name` - 下载二进制文件
 
 ### Web页面
 
