@@ -208,12 +208,12 @@ get_sha256sum() {
 
 query_latest_sha256() {
     local bin_name="$1"
-    
+
     if [[ -z "$bin_name" ]]; then
         error "bin_name is required for query_latest_sha256"
         return 1
     fi
-    
+
     local url="${BIN_MANAGER_API}/bins/${bin_name}"
 
     local response
@@ -248,12 +248,12 @@ query_latest_sha256() {
 download_binary() {
     local bin_name="$1"
     local temp_file="$2"
-    
+
     if [[ -z "$bin_name" ]] || [[ -z "$temp_file" ]]; then
         error "bin_name and temp_file are required for download_binary"
         return 1
     fi
-    
+
     # Check disk space before download (require at least 100MB free)
     local required_space=102400  # 100MB in KB
     local available
@@ -262,7 +262,7 @@ download_binary() {
         error "Insufficient disk space in /tmp (available: ${available}KB, required: ${required_space}KB)"
         return 1
     fi
-    
+
     local url="${DOWNLOAD_BASE_URL}/${bin_name}"
 
     log "Downloading $bin_name from $url"
@@ -284,7 +284,7 @@ update_binary() {
     local bin_name="$1"
     local current_sha256="$2"
     local latest_sha256="$3"
-    
+
     if [[ -z "$bin_name" ]]; then
         error "bin_name is required for update_binary"
         return 1
@@ -403,7 +403,7 @@ update_manifest() {
 process_binary() {
     local bin_name="$1"
     local current_sha256="$2"
-    
+
     if [[ -z "$bin_name" ]]; then
         error "bin_name is required for process_binary"
         return 1
