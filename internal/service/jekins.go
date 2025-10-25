@@ -416,7 +416,7 @@ func (s *JenkinsMgr) WaitForJobCompletion() *BuildResult {
 	return nil
 }
 
-func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
+func (s *JenkinsMgr) DownloadBin(buildResult *BuildResult, filename string) (string, error) {
 	if buildResult == nil || buildResult.Build == nil {
 		return "", fmt.Errorf("invalid build result")
 	}
@@ -425,7 +425,7 @@ func (s *JenkinsMgr) DownloadStreamd(buildResult *BuildResult) (string, error) {
 	artifacts := buildResult.Build.GetArtifacts()
 
 	for _, artifact := range artifacts {
-		if artifact.FileName == "streamd" {
+		if strings.Contains(artifact.FileName, filename) {
 			downloadDir := "./downloads"
 			success, err := artifact.SaveToDir(ctx, downloadDir)
 			if err != nil {

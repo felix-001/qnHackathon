@@ -1,6 +1,8 @@
 package service
 
 import (
+	"strings"
+
 	cfg "github.com/felix-001/qnHackathon/internal/config"
 	"github.com/rs/zerolog/log"
 )
@@ -19,7 +21,7 @@ func NewManager(conf *cfg.Config) *Manager {
 	}
 }
 
-func (m *Manager) Run() {
+func (m *Manager) Build() {
 	m.jenkinsMgr.StartJob()
 
 	buildResult := m.jenkinsMgr.WaitForJobCompletion()
@@ -28,15 +30,21 @@ func (m *Manager) Run() {
 		return
 	}
 
-	streamdPath, err := m.jenkinsMgr.DownloadStreamd(buildResult)
+	streamdPath, err := m.jenkinsMgr.DownloadBin(buildResult, "streamd")
 	if err != nil {
 		log.Logger.Error().Err(err).Msg("Failed to download streamd")
 		return
 	}
 	log.Logger.Info().Msgf("Successfully downloaded streamd to: %s", streamdPath)
 
-	m.gitlabMgr.UpdateVersion("streamd.json", "streamd-20251025-14-38-30.tar.gz")
-	mrUrl := m.gitlabMgr.GetMrUrl("streamd-20251025-14-38-30.tar.gz")
+	parts := strings.Split(streamdPath, "/")
+	if len(parts) != 3 {
+		log.Logger.Info().Msgf("parse streamdPath err")
+		return
+	}
+
+	m.gitlabMgr.UpdateVersion("streamd.json", parts[2])
+	mrUrl := m.gitlabMgr.GetMrUrl(parts[2])
 	if mrUrl == "" {
 		log.Logger.Error().Msg("GetMrUrl: 无法获取 MergeRequest URL")
 		return
