@@ -60,7 +60,7 @@ go mod download
 ### 运行服务
 
 ```bash
-go run cmd/manager/main.go
+go run cmd/manager/main.go -f internal/config/manager.json
 ```
 
 服务将在 http://localhost:8080 启动
