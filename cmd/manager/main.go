@@ -52,6 +52,8 @@ func main() {
 	releaseHandler := handler.NewReleaseHandler(releaseService, mgr)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	binHandler := handler.NewBinHandler(binService)
+	binHandler.SetGitLabMgr(service.NewGitLabMgr(cfg.GitlabConf))
+	binHandler.SetReleaseService(releaseService)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)

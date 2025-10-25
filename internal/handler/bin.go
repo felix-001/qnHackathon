@@ -1,20 +1,38 @@
 package handler
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-gonic/gin"
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 type BinHandler struct {
-	binService *service.BinService
+	binService     *service.BinService
+	gitlabMgr      *service.GitLabMgr
+	releaseService *service.ReleaseService
 }
 
 func NewBinHandler(binService *service.BinService) *BinHandler {
 	return &BinHandler{
 		binService: binService,
 	}
+}
+
+func (h *BinHandler) SetGitLabMgr(gitlabMgr *service.GitLabMgr) {
+	h.gitlabMgr = gitlabMgr
+}
+
+func (h *BinHandler) SetReleaseService(releaseService *service.ReleaseService) {
+	h.releaseService = releaseService
 }
 
 func (h *BinHandler) GetKeepalive(c *gin.Context) {
@@ -62,15 +80,60 @@ func (h *BinHandler) PostKeepalive(c *gin.Context) {
 }
 
 func (h *BinHandler) GetBin(c *gin.Context) {
-	binName := c.Param("bin_name")
-
-	bin, ok := h.binService.GetBin(binName)
-	if !ok {
-		c.JSON(http.StatusNotFound, gin.H{"error": "binary not found"})
+	if h.gitlabMgr == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "GitLab manager not initialized"})
 		return
 	}
 
-	c.JSON(http.StatusOK, bin)
+	masterBranch := "master"
+	file, resp, err := h.gitlabMgr.Client.RepositoryFiles.GetFile(
+		h.gitlabMgr.Conf.ProjectID,
+		"streamd.json",
+		&gitlab.GetFileOptions{
+			Ref: &masterBranch,
+		})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to fetch streamd.json: %v", err)})
+		return
+	}
+	if resp.StatusCode != http.StatusOK {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch streamd.json from GitLab"})
+		return
+	}
+
+	var streamdData struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(file.Content), &streamdData); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to parse streamd.json: %v", err)})
+		return
+	}
+
+	filePath := filepath.Join("downloads", streamdData.Version)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "version file not found in downloads"})
+		return
+	}
+
+	fileHandle, err := os.Open(filePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to open file: %v", err)})
+		return
+	}
+	defer fileHandle.Close()
+
+	hash := md5.New()
+	if _, err := io.Copy(hash, fileHandle); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to calculate MD5: %v", err)})
+		return
+	}
+
+	md5Sum := hex.EncodeToString(hash.Sum(nil))
+
+	c.JSON(http.StatusOK, gin.H{
+		"version": streamdData.Version,
+		"md5":     md5Sum,
+	})
 }
 
 func (h *BinHandler) PostBin(c *gin.Context) {
@@ -104,11 +167,31 @@ func (h *BinHandler) PostProgress(c *gin.Context) {
 		TargetHash     string `json:"targetHash" binding:"required"`
 		ProcessingTime *int   `json:"processingTime"`
 		Status         string `json:"status" binding:"required"`
+		ReleaseID      string `json:"releaseId"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "nodeName, targetHash, and status are required"})
 		return
+	}
+
+	if h.releaseService != nil && req.ReleaseID != "" {
+		release, err := h.releaseService.Get(req.ReleaseID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get release"})
+			return
+		}
+		if release.Status != "approved" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "release not approved"})
+			return
+		}
+
+		if req.Status == "success" {
+			if err := h.releaseService.Complete(req.ReleaseID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update release status"})
+				return
+			}
+		}
 	}
 
 	h.binService.RecordProgress(
@@ -130,11 +213,26 @@ func (h *BinHandler) PostProgress(c *gin.Context) {
 func (h *BinHandler) Download(c *gin.Context) {
 	binFileName := c.Param("bin_file_name")
 
-	c.JSON(http.StatusOK, gin.H{
-		"message":       "download endpoint - implement actual file serving as needed",
-		"bin_file_name": binFileName,
-		"note":          "This is a mock endpoint. In production, serve actual binary files here.",
-	})
+	releaseID := c.Query("releaseId")
+	if h.releaseService != nil && releaseID != "" {
+		release, err := h.releaseService.Get(releaseID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get release"})
+			return
+		}
+		if release.Status != "approved" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "release not approved"})
+			return
+		}
+	}
+
+	filePath := filepath.Join("downloads", binFileName)
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "file not found"})
+		return
+	}
+
+	c.File(filePath)
 }
 
 func (h *BinHandler) Health(c *gin.Context) {
