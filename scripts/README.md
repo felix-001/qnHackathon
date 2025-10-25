@@ -61,6 +61,11 @@ bin-proxy 的版本（同时维护到 bin-proxy 中）
 10. **节点信息管理** - 自动收集和上报节点信息（CPU架构、系统版本等）
 11. **Keepalive 机制** - 定期向 API 上报节点状态
 
+### supervisor 重启方式
+
+- 本地重启：使用 `supervisorctl restart {service_name}` 命令重启服务
+- 远程重启：通过 http 接口：supervisorctl -s <http://IP:9001> -u admin -p 123456 status
+
 ## 前置要求
 
 - `curl` - 用于 API 请求
