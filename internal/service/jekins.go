@@ -363,7 +363,7 @@ func (s *JenkinsMgr) JenkBuild(module string) bool {
 }
 
 func (s *JenkinsMgr) StartJob() {
-	_, err := s.Client.BuildJob(context.Background(), "test", nil)
+	_, err := s.Client.BuildJob(context.Background(), "streamd", nil)
 	if err != nil {
 		log.Logger.Error().Err(err).Msg("BuildJob")
 		return

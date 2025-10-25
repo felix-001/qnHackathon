@@ -1,8 +1,8 @@
 {
 	"jenkinsConf": {
-		"apitoken":"11446ecf7370d23c21b6a24fc64a1d4c98",
+		"apitoken":"1121663f3a6d2b50936ed1f9bd2648826c",
 		"username":"admin",
-		"url": "http://localhost:8080",
-		"projectID":"test"
+		"url": "http://101.133.131.188:38010",
+		"projectID":"streamd"
 	}
 }
