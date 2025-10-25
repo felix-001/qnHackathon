@@ -10,5 +10,11 @@
       "version": "latest",
       "currentMd5": ""
     }
-  ]
+  ],
+  "nodeInfo": {
+    "cpuArch": "",
+    "osRelease": "",
+    "nodeName": "",
+    "binProxyVersion": ""
+  }
 }
