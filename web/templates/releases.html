@@ -31,6 +31,8 @@
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 4px; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+        .btn-edit { background: #52c41a; margin-right: 8px; }
+        .btn-edit:hover { background: #73d13d; }
     </style>
 </head>
 <body>
@@ -65,8 +67,9 @@
 
     <div id="modal" class="modal">
         <div class="modal-content">
-            <h2>创建发布任务</h2>
+            <h2 id="modalTitle">创建发布任务</h2>
             <form id="releaseForm">
+                <input type="hidden" name="id" id="releaseId">
                 <div class="form-group">
                     <label>项目ID</label>
                     <input type="text" name="projectId" required>
@@ -111,11 +114,20 @@
     </div>
 
     <script>
+        let currentReleases = [];
+        let editingReleaseId = null;
+
         function showModal() {
+            document.getElementById('modalTitle').textContent = '创建发布任务';
+            document.getElementById('releaseForm').reset();
+            document.getElementById('releaseId').value = '';
+            editingReleaseId = null;
             document.getElementById('modal').style.display = 'block';
         }
         function hideModal() {
             document.getElementById('modal').style.display = 'none';
+            document.getElementById('releaseForm').reset();
+            editingReleaseId = null;
         }
 
         function getStatusTag(status) {
@@ -133,6 +145,7 @@
             fetch('/api/v1/releases')
                 .then(res => res.json())
                 .then(data => {
+                    currentReleases = data.data || [];
                     const tbody = document.getElementById('releaseList');
                     tbody.innerHTML = (data.data || []).map(r => `
                         <tr>
@@ -145,6 +158,7 @@
                             <td>${r.gitlabPrUrl ? `<a href="${r.gitlabPrUrl}" target="_blank">查看PR</a>` : '-'}</td>
                             <td>${new Date(r.createdAt).toLocaleString()}</td>
                             <td>
+                                <button class="btn btn-edit" onclick="editRelease('${r.id}')">编辑</button>
                                 ${r.status === 'completed' ? `<button class="btn btn-danger" onclick="rollback('${r.id}')">回滚</button>` : ''}
                             </td>
                         </tr>
@@ -152,21 +166,50 @@
                 });
         }
 
+        function editRelease(id) {
+            const release = currentReleases.find(r => r.id === id);
+            if (release) {
+                editingReleaseId = id;
+                document.getElementById('modalTitle').textContent = '编辑发布任务';
+                document.getElementById('releaseId').value = release.id;
+                document.querySelector('input[name="projectId"]').value = release.projectId || '';
+                document.querySelector('input[name="applicationId"]').value = release.applicationId || '';
+                document.querySelector('input[name="version"]').value = release.version || '';
+                document.querySelector('select[name="environment"]').value = release.environment || '';
+                document.querySelector('select[name="strategy"]').value = release.strategy || '';
+                document.querySelector('input[name="gitlabPrUrl"]').value = release.gitlabPrUrl || '';
+                document.querySelector('textarea[name="description"]').value = release.description || '';
+                document.getElementById('modal').style.display = 'block';
+            }
+        }
+
         document.getElementById('releaseForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-            data.id = 'rel-' + Date.now();
-            data.scheduler = 'admin';
             
-            fetch('/api/v1/releases', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            }).then(() => {
-                hideModal();
-                loadReleases();
-            });
+            if (editingReleaseId) {
+                data.id = editingReleaseId;
+                fetch(`/api/v1/releases/${editingReleaseId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(() => {
+                    hideModal();
+                    loadReleases();
+                });
+            } else {
+                data.id = 'rel-' + Date.now();
+                data.scheduler = 'admin';
+                fetch('/api/v1/releases', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                }).then(() => {
+                    hideModal();
+                    loadReleases();
+                });
+            }
         });
 
         function rollback(id) {
