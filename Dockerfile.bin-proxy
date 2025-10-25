@@ -9,13 +9,13 @@ RUN apk --no-cache add \
 
 WORKDIR /app
 
-COPY scripts/bin-proxy.sh /app/bin-proxy
+COPY scripts/binproxy.py /app/binproxy
 COPY scripts/bin-inspector.sh /app/bin-inspector
 COPY scripts/bin-manifests.json /app/bin-manifests.json
 
-RUN chmod +x /app/bin-proxy /app/bin-inspector
+RUN chmod +x /app/binproxy /app/bin-inspector
 
-RUN echo '* * * * * /app/bin-proxy >> /app/bin-proxy.log 2>&1' > /etc/crontabs/root && \
+RUN echo '* * * * * /app/binproxy >> /app/binproxy.log 2>&1' > /etc/crontabs/root && \
     echo '* * * * * /app/bin-inspector >> /app/bin-inspector.log 2>&1' >> /etc/crontabs/root
 
 CMD ["crond", "-f", "-l", "2"]
