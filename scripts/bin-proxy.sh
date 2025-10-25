@@ -8,8 +8,10 @@ BIN_MANAGER_API="${BIN_MANAGER_API:-http://localhost:8080/api/v1}"
 BIN_DIR="${BIN_DIR:-/usr/local/bin}"
 LOG_FILE="${LOG_FILE:-/var/log/bin-proxy.log}"
 LOCK_DIR="${LOCK_DIR:-/var/run/bin-proxy}"
-BIN_PROXY_VERSION="1.1.0"
+LOCK_TIMEOUT="${LOCK_TIMEOUT:-600}"
+BIN_PROXY_VERSION="1.2.0"
 DOWNLOAD_BASE_URL="${DOWNLOAD_BASE_URL:-${BIN_MANAGER_API}/download}"
+DOWNLOAD_TIMEOUT="${DOWNLOAD_TIMEOUT:-300}"
 
 mkdir -p "$LOCK_DIR"
 
@@ -63,7 +65,7 @@ acquire_lock() {
     local old_locks
     old_locks=$(ls "${LOCK_DIR}/${bin_name}"-*.lock 2>/dev/null || true)
     if [[ -n "$old_locks" ]]; then
-        for old_lock in $old_locks; do
+        for old_lock in "$old_locks"; do
             if [[ "$old_lock" != "$lock_file" ]]; then
                 log "Removing old lock file: $old_lock"
                 rm -f "$old_lock"
@@ -78,7 +80,7 @@ acquire_lock() {
         current_time=$(date +%s)
         local elapsed=$((current_time - lock_time))
 
-        if [[ $elapsed -lt 600 ]]; then
+        if [[ $elapsed -lt $LOCK_TIMEOUT ]]; then
             log "Lock exists for $bin_name-$bin_hash (held for ${elapsed}s), skipping"
             return 1
         else
@@ -87,9 +89,16 @@ acquire_lock() {
         fi
     fi
 
-    date +%s > "$lock_file"
-    log "Acquired lock for $bin_name-$bin_hash"
-    return 0
+    # Atomic lock acquisition to prevent race condition
+    local current_time
+    current_time=$(date +%s)
+    if (set -o noclobber; echo "$current_time" > "$lock_file") 2>/dev/null; then
+        log "Acquired lock for $bin_name-$bin_hash"
+        return 0
+    else
+        log "Failed to acquire lock for $bin_name-$bin_hash"
+        return 1
+    fi
 }
 
 release_lock() {
@@ -159,7 +168,7 @@ kill_old_downloads() {
     local bin_name="$1"
 
     local pids
-    pids=$(pgrep -f "curl.*${bin_name}" | grep -v "$$" || true)
+    pids=$(pgrep -f "curl.*${DOWNLOAD_BASE_URL}/${bin_name}$" | grep -v "$$" || true)
 
     if [[ -n "$pids" ]]; then
         log "Killing old download processes for $bin_name: $pids"
@@ -169,13 +178,13 @@ kill_old_downloads() {
 
 post_update_status() {
     local bin_name="$1"
-    local new_md5="$2"
+    local new_sha256="$2"
 
     local node_name
     node_name=$(hostname)
 
     local payload
-    payload="{\"nodeName\":\"$node_name\",\"binName\":\"$bin_name\",\"md5\":\"$new_md5\",\"version\":\"latest\"}"
+    payload="{\"nodeName\":\"$node_name\",\"binName\":\"$bin_name\",\"sha256\":\"$new_sha256\",\"version\":\"latest\"}"
 
     if curl -s -X POST -H "Content-Type: application/json" \
         -d "$payload" \
@@ -188,17 +197,23 @@ post_update_status() {
     fi
 }
 
-get_md5sum() {
+get_sha256sum() {
     local file="$1"
     if [[ ! -f "$file" ]]; then
         echo ""
         return
     fi
-    md5sum "$file" | awk '{print $1}'
+    sha256sum "$file" | awk '{print $1}'
 }
 
-query_latest_md5() {
+query_latest_sha256() {
     local bin_name="$1"
+
+    if [[ -z "$bin_name" ]]; then
+        error "bin_name is required for query_latest_sha256"
+        return 1
+    fi
+
     local url="${BIN_MANAGER_API}/bins/${bin_name}"
 
     local response
@@ -206,29 +221,50 @@ query_latest_md5() {
 
     if [[ $? -ne 0 ]]; then
         log "Trying alternative endpoint for $bin_name"
-        url="${BIN_MANAGER_API}/releases/latest/${bin_name}/md5"
+        url="${BIN_MANAGER_API}/releases/latest/${bin_name}/sha256"
         response=$(curl -s -f "$url" 2>/dev/null)
         if [[ $? -ne 0 ]]; then
-            error "Failed to query latest MD5 for $bin_name"
+            error "Failed to query latest SHA256 for $bin_name"
             echo ""
             return 1
         fi
     fi
 
-    echo "$response" | grep -o '"md5":"[^"]*"' | cut -d'"' -f4
+    # Validate JSON response
+    if ! echo "$response" | jq -e '.sha256' > /dev/null 2>&1; then
+        error "Invalid API response format for $bin_name (sha256 field missing)"
+        return 1
+    fi
+    
+    echo "$response" | jq -r '.sha256'
 }
 
 download_binary() {
     local bin_name="$1"
     local temp_file="$2"
+
+    if [[ -z "$bin_name" ]] || [[ -z "$temp_file" ]]; then
+        error "bin_name and temp_file are required for download_binary"
+        return 1
+    fi
+
+    # Check disk space before download (require at least 100MB free)
+    local required_space=102400  # 100MB in KB
+    local available
+    available=$(df /tmp | tail -1 | awk '{print $4}')
+    if [[ $available -lt $required_space ]]; then
+        error "Insufficient disk space in /tmp (available: ${available}KB, required: ${required_space}KB)"
+        return 1
+    fi
+
     local url="${DOWNLOAD_BASE_URL}/${bin_name}"
 
     log "Downloading $bin_name from $url"
 
-    if ! curl -s -f -o "$temp_file" "$url"; then
+    if ! curl -s -f --max-time "$DOWNLOAD_TIMEOUT" -o "$temp_file" "$url"; then
         log "Trying alternative download endpoint"
         url="${BIN_MANAGER_API}/releases/latest/${bin_name}/download"
-        if ! curl -s -f -o "$temp_file" "$url"; then
+        if ! curl -s -f --max-time "$DOWNLOAD_TIMEOUT" -o "$temp_file" "$url"; then
             error "Failed to download $bin_name"
             return 1
         fi
@@ -240,39 +276,49 @@ download_binary() {
 
 update_binary() {
     local bin_name="$1"
-    local current_md5="$2"
-    local latest_md5="$3"
+    local current_sha256="$2"
+    local latest_sha256="$3"
 
-    if [[ "$current_md5" == "$latest_md5" ]] && [[ -n "$current_md5" ]]; then
-        log "$bin_name is already up to date (MD5: $current_md5)"
+    if [[ -z "$bin_name" ]]; then
+        error "bin_name is required for update_binary"
+        return 1
+    fi
+
+    if [[ "$current_sha256" == "$latest_sha256" ]] && [[ -n "$current_sha256" ]]; then
+        log "$bin_name is already up to date (SHA256: $current_sha256)"
         return 0
     fi
 
-    log "Updating $bin_name (current: $current_md5, latest: $latest_md5)"
+    log "Updating $bin_name (current: $current_sha256, latest: $latest_sha256)"
 
     kill_old_downloads "$bin_name"
 
     local bin_path="${BIN_DIR}/${bin_name}"
     local temp_file="/tmp/${bin_name}.tmp.$$"
 
-    report_progress "$bin_name" "$latest_md5"
+    report_progress "$bin_name" "$latest_sha256"
 
     if ! download_binary "$bin_name" "$temp_file"; then
-        report_completion "$bin_name" "$latest_md5" "failed"
+        report_completion "$bin_name" "$latest_sha256" "failed"
         return 1
     fi
 
-    local downloaded_md5
-    downloaded_md5=$(get_md5sum "$temp_file")
+    local downloaded_sha256
+    downloaded_sha256=$(get_sha256sum "$temp_file")
 
-    if [[ "$downloaded_md5" != "$latest_md5" ]]; then
-        error "MD5 mismatch for downloaded $bin_name (expected: $latest_md5, got: $downloaded_md5)"
+    if [[ "$downloaded_sha256" != "$latest_sha256" ]]; then
+        error "SHA256 mismatch for downloaded $bin_name (expected: $latest_sha256, got: $downloaded_sha256)"
         rm -f "$temp_file"
-        report_completion "$bin_name" "$latest_md5" "failed"
+        report_completion "$bin_name" "$latest_sha256" "failed"
         return 1
     fi
 
+    # Backup with rotation (keep one old backup)
     if [[ -f "$bin_path" ]]; then
+        if [[ -f "${bin_path}.backup" ]]; then
+            rm -f "${bin_path}.backup.old"
+            mv "${bin_path}.backup" "${bin_path}.backup.old"
+        fi
         cp "$bin_path" "${bin_path}.backup"
     fi
 
@@ -285,30 +331,52 @@ update_binary() {
         log "Restarting service: $bin_name via supervisor"
         if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
             log "Service $bin_name restarted successfully"
-            report_completion "$bin_name" "$latest_md5" "success"
+            # Verify service is running
+            sleep 2
+            if supervisorctl status "$bin_name" | grep -q RUNNING; then
+                log "Service $bin_name verified running after restart"
+                report_completion "$bin_name" "$latest_sha256" "success"
+            else
+                error "Service $bin_name not running after restart"
+                if [[ -f "${bin_path}.backup" ]]; then
+                    log "Rolling back to previous version"
+                    mv "${bin_path}.backup" "$bin_path"
+                    if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
+                        log "Rollback successful, service restarted"
+                    else
+                        error "Rollback failed - service may be down"
+                    fi
+                fi
+                report_completion "$bin_name" "$latest_sha256" "failed"
+                return 1
+            fi
         else
             error "Failed to restart service $bin_name"
             if [[ -f "${bin_path}.backup" ]]; then
                 log "Rolling back to previous version"
                 mv "${bin_path}.backup" "$bin_path"
-                supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"
+                if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
+                    log "Rollback successful, service restarted"
+                else
+                    error "Rollback failed - service may be down"
+                fi
             fi
-            report_completion "$bin_name" "$latest_md5" "failed"
+            report_completion "$bin_name" "$latest_sha256" "failed"
             return 1
         fi
     else
         log "supervisorctl not found, skipping service restart"
-        report_completion "$bin_name" "$latest_md5" "success"
+        report_completion "$bin_name" "$latest_sha256" "success"
     fi
 
-    post_update_status "$bin_name" "$latest_md5"
+    post_update_status "$bin_name" "$latest_sha256"
 
     return 0
 }
 
 update_manifest() {
     local bin_name="$1"
-    local new_md5="$2"
+    local new_sha256="$2"
 
     if [[ ! -f "$BIN_MANIFESTS" ]]; then
         error "Manifests file not found: $BIN_MANIFESTS"
@@ -317,8 +385,8 @@ update_manifest() {
 
     if command -v jq &> /dev/null; then
         local temp_file="/tmp/bin-manifests.tmp.$$"
-        jq --arg name "$bin_name" --arg md5 "$new_md5" \
-            '(.binaries[] | select(.name == $name) | .currentMd5) = $md5' \
+        jq --arg name "$bin_name" --arg sha256 "$new_sha256" \
+            '(.binaries[] | select(.name == $name) | .currentSha256) = $sha256' \
             "$BIN_MANIFESTS" > "$temp_file"
         mv "$temp_file" "$BIN_MANIFESTS"
     else
@@ -328,29 +396,34 @@ update_manifest() {
 
 process_binary() {
     local bin_name="$1"
-    local current_md5="$2"
+    local current_sha256="$2"
+
+    if [[ -z "$bin_name" ]]; then
+        error "bin_name is required for process_binary"
+        return 1
+    fi
 
     log "Processing binary: $bin_name"
 
-    local latest_md5
-    latest_md5=$(query_latest_md5 "$bin_name")
+    local latest_sha256
+    latest_sha256=$(query_latest_sha256 "$bin_name")
 
-    if [[ -z "$latest_md5" ]]; then
-        error "Failed to get latest MD5 for $bin_name"
+    if [[ -z "$latest_sha256" ]]; then
+        error "Failed to get latest SHA256 for $bin_name"
         return 1
     fi
 
-    if ! acquire_lock "$bin_name" "$latest_md5"; then
+    if ! acquire_lock "$bin_name" "$latest_sha256"; then
         return 1
     fi
 
-    if update_binary "$bin_name" "$current_md5" "$latest_md5"; then
-        update_manifest "$bin_name" "$latest_md5"
-        release_lock "$bin_name" "$latest_md5"
+    if update_binary "$bin_name" "$current_sha256" "$latest_sha256"; then
+        update_manifest "$bin_name" "$latest_sha256"
+        release_lock "$bin_name" "$latest_sha256"
         return 0
     fi
 
-    release_lock "$bin_name" "$latest_md5"
+    release_lock "$bin_name" "$latest_sha256"
     return 1
 }
 
@@ -390,11 +463,11 @@ main() {
     keepalive_check
 
     local binaries
-    binaries=$(jq -r '.binaries[] | "\(.name):\(.currentMd5)"' "$BIN_MANIFESTS")
+    binaries=$(jq -r '.binaries[] | "\(.name):\(.currentSha256 // "")"' "$BIN_MANIFESTS")
 
-    while IFS=: read -r bin_name current_md5; do
+    while IFS=: read -r bin_name current_sha256; do
         if [[ -n "$bin_name" ]]; then
-            process_binary "$bin_name" "$current_md5" || true
+            process_binary "$bin_name" "$current_sha256" || true
         fi
     done <<< "$binaries"
 
