@@ -3,12 +3,16 @@
     {
       "name": "manager",
       "version": "latest",
-      "currentSha256": ""
+      "currentSha256": "",
+      "port": 8080,
+      "versionHistory": []
     },
     {
       "name": "example-service",
       "version": "latest",
-      "currentSha256": ""
+      "currentSha256": "",
+      "port": 9090,
+      "versionHistory": []
     }
   ],
   "nodeInfo": {

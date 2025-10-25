@@ -274,6 +274,182 @@ download_binary() {
     return 0
 }
 
+change_version() {
+    local bin_name="$1"
+    local target_sha256="$2"
+    local operation="${3:-upgrade}"
+
+    if [[ -z "$bin_name" ]] || [[ -z "$target_sha256" ]]; then
+        error "bin_name and target_sha256 are required for change_version"
+        return 1
+    fi
+
+    local bin_path="${BIN_DIR}/${bin_name}"
+    local bin_archive_dir="${BIN_DIR}/.archive/${bin_name}"
+    mkdir -p "$bin_archive_dir"
+
+    log "[$operation] Changing $bin_name to version (SHA256: $target_sha256)"
+
+    local source_file=""
+
+    if [[ "$operation" == "rollback" ]]; then
+        source_file="${bin_archive_dir}/${target_sha256}"
+        if [[ ! -f "$source_file" ]]; then
+            error "Rollback failed: archived binary not found for SHA256: $target_sha256"
+            return 1
+        fi
+        log "Using archived binary for rollback: $source_file"
+    else
+        kill_old_downloads "$bin_name"
+        source_file="/tmp/${bin_name}.tmp.$$"
+        report_progress "$bin_name" "$target_sha256"
+
+        if ! download_binary "$bin_name" "$source_file"; then
+            report_completion "$bin_name" "$target_sha256" "failed"
+            return 1
+        fi
+
+        local downloaded_sha256
+        downloaded_sha256=$(get_sha256sum "$source_file")
+
+        if [[ "$downloaded_sha256" != "$target_sha256" ]]; then
+            error "SHA256 mismatch for downloaded $bin_name (expected: $target_sha256, got: $downloaded_sha256)"
+            rm -f "$source_file"
+            report_completion "$bin_name" "$target_sha256" "failed"
+            return 1
+        fi
+    fi
+
+    local current_sha256=""
+    if [[ -f "$bin_path" ]]; then
+        current_sha256=$(get_sha256sum "$bin_path")
+        if [[ -n "$current_sha256" ]]; then
+            local archive_path="${bin_archive_dir}/${current_sha256}"
+            if [[ ! -f "$archive_path" ]]; then
+                cp "$bin_path" "$archive_path"
+                chmod +x "$archive_path"
+                log "Archived current binary: $archive_path"
+            fi
+        fi
+    fi
+
+    if [[ "$operation" == "upgrade" ]]; then
+        cp "$source_file" "$bin_path"
+        rm -f "$source_file"
+    else
+        cp "$source_file" "$bin_path"
+    fi
+    chmod +x "$bin_path"
+
+    log "Binary file replaced successfully"
+
+    if command -v supervisorctl &> /dev/null; then
+        log "Restarting service: $bin_name via supervisor"
+        if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
+            log "Service $bin_name restarted successfully"
+            sleep 2
+            if supervisorctl status "$bin_name" | grep -q RUNNING; then
+                log "Service $bin_name verified running after restart"
+                if [[ "$operation" == "upgrade" ]]; then
+                    report_completion "$bin_name" "$target_sha256" "success"
+                    post_update_status "$bin_name" "$target_sha256"
+                fi
+                record_version_change "$bin_name" "$current_sha256" "$target_sha256" "$operation" "success"
+                return 0
+            else
+                error "Service $bin_name not running after restart"
+                if [[ -n "$current_sha256" ]]; then
+                    log "Auto-rollback: restoring previous version"
+                    local rollback_source="${bin_archive_dir}/${current_sha256}"
+                    if [[ -f "$rollback_source" ]]; then
+                        cp "$rollback_source" "$bin_path"
+                        if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
+                            log "Auto-rollback successful, service restarted"
+                            record_version_change "$bin_name" "$target_sha256" "$current_sha256" "auto-rollback" "success"
+                        else
+                            error "Auto-rollback failed - service may be down"
+                            record_version_change "$bin_name" "$target_sha256" "$current_sha256" "auto-rollback" "failed"
+                        fi
+                    fi
+                fi
+                if [[ "$operation" == "upgrade" ]]; then
+                    report_completion "$bin_name" "$target_sha256" "failed"
+                fi
+                record_version_change "$bin_name" "$current_sha256" "$target_sha256" "$operation" "failed"
+                return 1
+            fi
+        else
+            error "Failed to restart service $bin_name"
+            if [[ -n "$current_sha256" ]]; then
+                log "Auto-rollback: restoring previous version"
+                local rollback_source="${bin_archive_dir}/${current_sha256}"
+                if [[ -f "$rollback_source" ]]; then
+                    cp "$rollback_source" "$bin_path"
+                    if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
+                        log "Auto-rollback successful, service restarted"
+                        record_version_change "$bin_name" "$target_sha256" "$current_sha256" "auto-rollback" "success"
+                    else
+                        error "Auto-rollback failed - service may be down"
+                        record_version_change "$bin_name" "$target_sha256" "$current_sha256" "auto-rollback" "failed"
+                    fi
+                fi
+            fi
+            if [[ "$operation" == "upgrade" ]]; then
+                report_completion "$bin_name" "$target_sha256" "failed"
+            fi
+            record_version_change "$bin_name" "$current_sha256" "$target_sha256" "$operation" "failed"
+            return 1
+        fi
+    else
+        log "supervisorctl not found, skipping service restart"
+        if [[ "$operation" == "upgrade" ]]; then
+            report_completion "$bin_name" "$target_sha256" "success"
+            post_update_status "$bin_name" "$target_sha256"
+        fi
+        record_version_change "$bin_name" "$current_sha256" "$target_sha256" "$operation" "success"
+    fi
+
+    return 0
+}
+
+record_version_change() {
+    local bin_name="$1"
+    local from_sha256="$2"
+    local to_sha256="$3"
+    local operation="$4"
+    local result="$5"
+
+    if [[ ! -f "$BIN_MANIFESTS" ]]; then
+        return 1
+    fi
+
+    if command -v jq &> /dev/null; then
+        local temp_file="/tmp/bin-manifests.tmp.$$"
+        local timestamp
+        timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+        jq --arg name "$bin_name" \
+           --arg from "$from_sha256" \
+           --arg to "$to_sha256" \
+           --arg op "$operation" \
+           --arg res "$result" \
+           --arg ts "$timestamp" '
+            (.binaries[] | select(.name == $name)) |= (
+                .currentSha256 = $to |
+                .versionHistory //= [] |
+                .versionHistory += [{
+                    "from": $from,
+                    "to": $to,
+                    "operation": $op,
+                    "result": $res,
+                    "timestamp": $ts
+                }]
+            )' "$BIN_MANIFESTS" > "$temp_file"
+        mv "$temp_file" "$BIN_MANIFESTS"
+        log "Recorded version change: $bin_name ($operation: $from_sha256 -> $to_sha256, result: $result)"
+    fi
+}
+
 update_binary() {
     local bin_name="$1"
     local current_sha256="$2"
@@ -291,87 +467,23 @@ update_binary() {
 
     log "Updating $bin_name (current: $current_sha256, latest: $latest_sha256)"
 
-    kill_old_downloads "$bin_name"
+    change_version "$bin_name" "$latest_sha256" "upgrade"
+    return $?
+}
 
-    local bin_path="${BIN_DIR}/${bin_name}"
-    local temp_file="/tmp/${bin_name}.tmp.$$"
+rollback_binary() {
+    local bin_name="$1"
+    local target_sha256="$2"
 
-    report_progress "$bin_name" "$latest_sha256"
-
-    if ! download_binary "$bin_name" "$temp_file"; then
-        report_completion "$bin_name" "$latest_sha256" "failed"
+    if [[ -z "$bin_name" ]] || [[ -z "$target_sha256" ]]; then
+        error "bin_name and target_sha256 are required for rollback_binary"
         return 1
     fi
 
-    local downloaded_sha256
-    downloaded_sha256=$(get_sha256sum "$temp_file")
+    log "Rolling back $bin_name to SHA256: $target_sha256"
 
-    if [[ "$downloaded_sha256" != "$latest_sha256" ]]; then
-        error "SHA256 mismatch for downloaded $bin_name (expected: $latest_sha256, got: $downloaded_sha256)"
-        rm -f "$temp_file"
-        report_completion "$bin_name" "$latest_sha256" "failed"
-        return 1
-    fi
-
-    # Backup with rotation (keep one old backup)
-    if [[ -f "$bin_path" ]]; then
-        if [[ -f "${bin_path}.backup" ]]; then
-            rm -f "${bin_path}.backup.old"
-            mv "${bin_path}.backup" "${bin_path}.backup.old"
-        fi
-        cp "$bin_path" "${bin_path}.backup"
-    fi
-
-    mv "$temp_file" "$bin_path"
-    chmod +x "$bin_path"
-
-    log "Successfully updated $bin_name"
-
-    if command -v supervisorctl &> /dev/null; then
-        log "Restarting service: $bin_name via supervisor"
-        if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
-            log "Service $bin_name restarted successfully"
-            # Verify service is running
-            sleep 2
-            if supervisorctl status "$bin_name" | grep -q RUNNING; then
-                log "Service $bin_name verified running after restart"
-                report_completion "$bin_name" "$latest_sha256" "success"
-            else
-                error "Service $bin_name not running after restart"
-                if [[ -f "${bin_path}.backup" ]]; then
-                    log "Rolling back to previous version"
-                    mv "${bin_path}.backup" "$bin_path"
-                    if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
-                        log "Rollback successful, service restarted"
-                    else
-                        error "Rollback failed - service may be down"
-                    fi
-                fi
-                report_completion "$bin_name" "$latest_sha256" "failed"
-                return 1
-            fi
-        else
-            error "Failed to restart service $bin_name"
-            if [[ -f "${bin_path}.backup" ]]; then
-                log "Rolling back to previous version"
-                mv "${bin_path}.backup" "$bin_path"
-                if supervisorctl restart "$bin_name" 2>&1 | tee -a "$LOG_FILE"; then
-                    log "Rollback successful, service restarted"
-                else
-                    error "Rollback failed - service may be down"
-                fi
-            fi
-            report_completion "$bin_name" "$latest_sha256" "failed"
-            return 1
-        fi
-    else
-        log "supervisorctl not found, skipping service restart"
-        report_completion "$bin_name" "$latest_sha256" "success"
-    fi
-
-    post_update_status "$bin_name" "$latest_sha256"
-
-    return 0
+    change_version "$bin_name" "$target_sha256" "rollback"
+    return $?
 }
 
 update_manifest() {
