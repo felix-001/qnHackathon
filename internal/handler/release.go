@@ -11,14 +11,16 @@ import (
 )
 
 type ReleaseHandler struct {
-	service *service.ReleaseService
-	manager *service.Manager
+	service        *service.ReleaseService
+	manager        *service.Manager
+	projectService *service.ProjectService
 }
 
-func NewReleaseHandler(service *service.ReleaseService, manager *service.Manager) *ReleaseHandler {
+func NewReleaseHandler(service *service.ReleaseService, manager *service.Manager, projectService *service.ProjectService) *ReleaseHandler {
 	return &ReleaseHandler{
-		service: service,
-		manager: manager,
+		service:        service,
+		manager:        manager,
+		projectService: projectService,
 	}
 }
 
@@ -39,6 +41,14 @@ func (h *ReleaseHandler) Create(c *gin.Context) {
 			Message: err.Error(),
 		})
 		return
+	}
+
+	projects := h.projectService.List()
+	for _, p := range projects {
+		if p.ID == release.ProjectID {
+			release.ProjectName = p.Name
+			break
+		}
 	}
 
 	if err := h.service.Create(&release); err != nil {

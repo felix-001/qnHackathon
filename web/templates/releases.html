@@ -81,8 +81,10 @@
             <form id="releaseForm">
                 <input type="hidden" name="id" id="releaseId">
                 <div class="form-group">
-                    <label>项目ID</label>
-                    <input type="text" name="projectId" required>
+                    <label>项目名称</label>
+                    <select name="projectId" id="projectSelect" required>
+                        <option value="">请选择项目</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>应用ID</label>
@@ -128,12 +130,14 @@
         let editingReleaseId = null;
         let deleteMode = false;
         let selectedReleases = new Set();
+        let projects = [];
 
         function showModal() {
             document.getElementById('modalTitle').textContent = '创建发布任务';
             document.getElementById('releaseForm').reset();
             document.getElementById('releaseId').value = '';
             editingReleaseId = null;
+            loadProjects();
             document.getElementById('modal').style.display = 'block';
         }
         function hideModal() {
@@ -176,7 +180,7 @@
                             <td style="display: ${deleteMode ? 'table-cell' : 'none'};">
                                 <input type="checkbox" class="release-checkbox" value="${r.id}" onchange="updateSelection('${r.id}')">
                             </td>
-                            <td>${r.projectId || '-'}</td>
+                            <td>${r.projectName || r.projectId || '-'}</td>
                             <td>${r.version}</td>
                             <td>${r.environment}</td>
                             <td>${r.strategy}</td>
@@ -191,13 +195,32 @@
                 });
         }
 
+        function loadProjects() {
+            fetch('/api/v1/projects')
+                .then(res => res.json())
+                .then(data => {
+                    projects = data.data || [];
+                    const select = document.getElementById('projectSelect');
+                    select.innerHTML = '<option value="">请选择项目</option>';
+                    projects.forEach(p => {
+                        const option = document.createElement('option');
+                        option.value = p.id;
+                        option.textContent = p.name;
+                        select.appendChild(option);
+                    });
+                });
+        }
+
         function editRelease(id) {
             const release = currentReleases.find(r => r.id === id);
             if (release) {
                 editingReleaseId = id;
                 document.getElementById('modalTitle').textContent = '编辑发布任务';
                 document.getElementById('releaseId').value = release.id;
-                document.querySelector('input[name="projectId"]').value = release.projectId || '';
+                loadProjects();
+                setTimeout(() => {
+                    document.querySelector('select[name="projectId"]').value = release.projectId || '';
+                }, 100);
                 document.querySelector('input[name="applicationId"]').value = release.applicationId || '';
                 document.querySelector('input[name="version"]').value = release.version || '';
                 document.querySelector('select[name="environment"]').value = release.environment || '';
