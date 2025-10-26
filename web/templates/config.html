@@ -367,14 +367,14 @@
                 const updateTime = new Date(config.updatedAt).toLocaleString('zh-CN');
                 const envName = getEnvName(config.environment);
                 const fileName = `${config.projectName}.json`;
-                const version = config.version || 1;
+                const version = config.version || 'v1.0.0';
                 
                 return `
                     <tr>
                         <td><strong>${config.projectName}</strong></td>
                         <td><span class="tag">${envName}</span></td>
                         <td><code>${fileName}</code></td>
-                        <td><span class="tag" style="background: #e6f7ff; color: #1890ff;">v${version}</span></td>
+                        <td><span class="tag" style="background: #e6f7ff; color: #1890ff;">${version}</span></td>
                         <td>${config.description || '-'}</td>
                         <td>${updateTime}</td>
                         <td>
@@ -552,6 +552,7 @@
                 }
                 
                 const checkboxDisabled = item.changeType === 'delete' ? 'disabled' : '';
+                const version = item.version || 'v1.0.0';
                 
                 return `
                     <div class="history-item">
@@ -561,6 +562,7 @@
                         </div>
                         <div class="time">${new Date(item.createdAt).toLocaleString('zh-CN')}</div>
                         <div>操作人: ${item.operator}</div>
+                        <div>版本号: <span class="tag" style="background: #e6f7ff; color: #1890ff;">${version}</span></div>
                         <div>原因: ${item.reason}</div>
                         ${item.gitlabMR ? `<div>GitLab MR: <a href="${item.gitlabMR}" target="_blank">${item.gitlabMR}</a></div>` : ''}
                         ${compareBtn}
@@ -775,7 +777,7 @@
                         <div style="padding: 4px 0;">
                             <label style="cursor: pointer; display: flex; align-items: center;">
                                 <input type="checkbox" name="versionCheck" value="${v}" style="margin-right: 8px;">
-                                <span>v${v}</span>
+                                <span>${v}</span>
                             </label>
                         </div>
                     `).join('');
@@ -901,7 +903,7 @@
             const operator = document.getElementById('grayOperator').value;
             const rules = getRules();
 
-            const selectedVersions = Array.from(document.querySelectorAll('input[name="versionCheck"]:checked')).map(cb => `v${cb.value}`);
+            const selectedVersions = Array.from(document.querySelectorAll('input[name="versionCheck"]:checked')).map(cb => cb.value);
             if (selectedVersions.length === 0) {
                 alert('请至少选择一个版本');
                 return;
@@ -975,7 +977,7 @@
                     
                     await loadVersionsForGray();
                     
-                    const selectedVersions = release.version.split(',').map(v => v.replace('v', ''));
+                    const selectedVersions = release.version.split(',');
                     selectedVersions.forEach(v => {
                         const checkbox = document.querySelector(`input[name="versionCheck"][value="${v}"]`);
                         if (checkbox) checkbox.checked = true;

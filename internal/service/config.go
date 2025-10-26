@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/felix-001/qnHackathon/internal/db"
@@ -88,7 +91,7 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 	if err != nil && err.Error() != "mongo: no documents in result" {
 		return err
 	}
-	config.Version = maxVersion + 1
+	config.Version = incrementVersion(maxVersion)
 
 	config.CreatedAt = time.Now()
 	config.UpdatedAt = time.Now()
@@ -111,6 +114,7 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 		ChangeType:  "create",
 		Reason:      reason,
 		Operator:    operator,
+		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
 
@@ -136,7 +140,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 	if err != nil && err.Error() != "mongo: no documents in result" {
 		return err
 	}
-	config.Version = maxVersion + 1
+	config.Version = incrementVersion(maxVersion)
 
 	config.UpdatedAt = time.Now()
 	config.ID = id
@@ -170,6 +174,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 		ChangeType:  "update",
 		Reason:      reason,
 		Operator:    operator,
+		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
 
@@ -207,6 +212,7 @@ func (s *ConfigService) Delete(id string, operator string, reason string) error 
 		ChangeType:  "delete",
 		Reason:      reason,
 		Operator:    operator,
+		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
 
@@ -308,11 +314,11 @@ func (s *ConfigService) CompareHistory(id1, id2 string) (map[string]interface{},
 	return result, nil
 }
 
-func (s *ConfigService) getMaxVersion(projectID, environment string) (int, error) {
+func (s *ConfigService) getMaxVersion(projectID, environment string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	opts := options.FindOne().SetSort(bson.D{{Key: "version", Value: -1}})
+	opts := options.FindOne().SetSort(bson.D{{Key: "createdAt", Value: -1}})
 	var config model.Config
 	err := s.db.Database.Collection("configs").FindOne(ctx, bson.M{
 		"projectId":   projectID,
@@ -320,13 +326,13 @@ func (s *ConfigService) getMaxVersion(projectID, environment string) (int, error
 	}, opts).Decode(&config)
 
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	return config.Version, nil
 }
 
-func (s *ConfigService) GetVersions(projectID, environment string) ([]int, error) {
+func (s *ConfigService) GetVersions(projectID, environment string) ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -336,7 +342,7 @@ func (s *ConfigService) GetVersions(projectID, environment string) ([]int, error
 			"projectId":   projectID,
 			"environment": environment,
 		},
-		options.Find().SetSort(bson.D{{Key: "version", Value: -1}}),
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
 	)
 	if err != nil {
 		return nil, err
@@ -348,11 +354,30 @@ func (s *ConfigService) GetVersions(projectID, environment string) ([]int, error
 		return nil, err
 	}
 
-	versions := make([]int, len(configs))
+	versions := make([]string, len(configs))
 	for i, config := range configs {
 		versions[i] = config.Version
 	}
 
 	return versions, nil
+}
+
+func incrementVersion(currentVersion string) string {
+	if currentVersion == "" {
+		return "v1.0.0"
+	}
+
+	version := strings.TrimPrefix(currentVersion, "v")
+	parts := strings.Split(version, ".")
+	if len(parts) != 3 {
+		return "v1.0.0"
+	}
+
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return "v1.0.0"
+	}
+
+	return fmt.Sprintf("v%s.%s.%d", parts[0], parts[1], patch+1)
 }
 
