@@ -45,6 +45,14 @@
         </div>
     </div>
 
+    <div id="grayRecordsModal" class="modal">
+        <div class="modal-content" style="max-width: 1000px;">
+            <h2>灰度发布记录</h2>
+            <div id="grayRecordsContent" style="margin: 20px 0;"></div>
+            <button type="button" class="btn" onclick="hideGrayRecordsModal()">关闭</button>
+        </div>
+    </div>
+
     <div id="modal" class="modal">
         <div class="modal-content">
             <h2 id="modalTitle">创建发布任务</h2>
@@ -458,6 +466,7 @@
             
             const menuItems = [
                 { icon: '📋', label: '查看详情', action: () => alert('版本详情:\n' + JSON.stringify(release, null, 2)) },
+                { icon: '🎯', label: '查看灰度记录', action: () => showGrayRecords(id) },
                 { icon: '📑', label: '复制版本', action: () => copyRelease(id) },
                 { icon: '🔍', label: '对比版本', action: () => alert('对比版本功能开发中...') },
                 { icon: '📝', label: '查看部署日志', action: () => alert('部署日志:\n发布时间: ' + new Date(release.createdAt).toLocaleString()) },
@@ -538,6 +547,109 @@ GitLab PR: ${release.gitlabPrUrl || '无'}
             a.download = `release-${release.version}-report.txt`;
             a.click();
             URL.revokeObjectURL(url);
+        }
+
+        async function showGrayRecords(releaseId) {
+            const release = currentReleases.find(r => r.id === releaseId);
+            if (!release) return;
+            
+            try {
+                const response = await fetch(`/api/v1/gray-releases?projectId=${release.projectId}&environment=${release.environment}`);
+                const data = await response.json();
+                
+                if (data.code === 200) {
+                    const grayReleases = (data.data || []).filter(gr => gr.version === release.version);
+                    renderGrayRecords(grayReleases, release);
+                    document.getElementById('grayRecordsModal').classList.add('active');
+                } else {
+                    alert('加载灰度记录失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('加载灰度记录失败:', error);
+                alert('加载灰度记录失败');
+            }
+        }
+
+        function renderGrayRecords(grayReleases, release) {
+            const container = document.getElementById('grayRecordsContent');
+            
+            if (grayReleases.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #999; padding: 40px;">
+                        <p>版本 <strong>${release.version}</strong> 暂无灰度发布记录</p>
+                        <button class="btn" onclick="goToGrayManagement('${release.projectId}', '${release.environment}', '${release.version}')">创建灰度规则</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = `
+                <div style="margin-bottom: 16px; padding: 12px; background: #f0f5ff; border-radius: 6px;">
+                    <strong>版本:</strong> ${release.version} | 
+                    <strong>项目:</strong> ${release.projectName || release.projectId} | 
+                    <strong>环境:</strong> ${release.environment}
+                </div>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #fafafa; border-bottom: 2px solid #f0f0f0;">
+                            <th style="padding: 12px; text-align: left;">策略类型</th>
+                            <th style="padding: 12px; text-align: left;">灰度规则</th>
+                            <th style="padding: 12px; text-align: left;">状态</th>
+                            <th style="padding: 12px; text-align: left;">操作人</th>
+                            <th style="padding: 12px; text-align: left;">创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${grayReleases.map(gr => {
+                            const statusName = gr.status === 'active' ? '进行中' : '已完成';
+                            const statusColor = gr.status === 'active' ? '#52c41a' : '#8c8c8c';
+                            
+                            let strategyType = '简单规则';
+                            let rulesText = '';
+                            
+                            if (gr.strategyType === 'advanced' && gr.strategies) {
+                                strategyType = '高级策略';
+                                rulesText = gr.strategies.map(s => {
+                                    const typeMap = { percentage: '百分比', hash: '哈希', whitelist: '白名单', blacklist: '黑名单', dimension: '维度', time_window: '时间窗口' };
+                                    const typeName = typeMap[s.type] || s.type;
+                                    if (s.type === 'percentage') return `${typeName}: ${s.percentage}%`;
+                                    if (s.type === 'hash') return `${typeName}: ${s.hashKey}`;
+                                    if (s.type === 'dimension') {
+                                        const dimMap = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' };
+                                        return `${dimMap[s.dimension] || s.dimension}: ${s.values.join(', ')}`;
+                                    }
+                                    if (s.values) return `${typeName}: ${s.values.join(', ')}`;
+                                    return typeName;
+                                }).join(' | ');
+                                if (gr.ruleLogic) rulesText = `[${gr.ruleLogic}] ` + rulesText;
+                            } else if (gr.rules) {
+                                rulesText = gr.rules.map(r => {
+                                    const dimMap = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' };
+                                    return `${dimMap[r.dimension] || r.dimension}: ${r.values.join(', ')}`;
+                                }).join(' | ');
+                            }
+                            
+                            return `
+                                <tr style="border-bottom: 1px solid #f0f0f0;">
+                                    <td style="padding: 12px;"><span style="background: #f0f5ff; color: #1890ff; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${strategyType}</span></td>
+                                    <td style="padding: 12px;">${rulesText}</td>
+                                    <td style="padding: 12px;"><span style="color: ${statusColor}; font-weight: 500;">${statusName}</span></td>
+                                    <td style="padding: 12px;">${gr.operator}</td>
+                                    <td style="padding: 12px;">${new Date(gr.createdAt).toLocaleString('zh-CN')}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function hideGrayRecordsModal() {
+            document.getElementById('grayRecordsModal').classList.remove('active');
+        }
+
+        function goToGrayManagement(projectId, environment, version) {
+            window.location.href = `/config?tab=gray&projectId=${projectId}&env=${environment}`;
         }
 
         loadReleases();

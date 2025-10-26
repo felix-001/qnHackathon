@@ -187,19 +187,37 @@ type GrayReleaseRule struct {
 	Values    []string `json:"values" bson:"values"`
 }
 
+type TimeWindow struct {
+	StartTime time.Time `json:"startTime" bson:"startTime"`
+	EndTime   time.Time `json:"endTime" bson:"endTime"`
+}
+
+type GrayReleaseStrategy struct {
+	Type       string      `json:"type" bson:"type"`
+	Dimension  string      `json:"dimension,omitempty" bson:"dimension,omitempty"`
+	Values     []string    `json:"values,omitempty" bson:"values,omitempty"`
+	Percentage int         `json:"percentage,omitempty" bson:"percentage,omitempty"`
+	HashKey    string      `json:"hashKey,omitempty" bson:"hashKey,omitempty"`
+	TimeWindow *TimeWindow `json:"timeWindow,omitempty" bson:"timeWindow,omitempty"`
+}
+
 type GrayReleaseConfig struct {
-	ID          string             `json:"id" bson:"_id,omitempty"`
-	ConfigID    string             `json:"configId" bson:"configId"`
-	ProjectID   string             `json:"projectId" bson:"projectId"`
-	ProjectName string             `json:"projectName" bson:"projectName"`
-	Environment string             `json:"environment" bson:"environment"`
-	Version     string             `json:"version" bson:"version"`
-	Rules       []GrayReleaseRule  `json:"rules" bson:"rules"`
-	Status      string             `json:"status" bson:"status"`
-	Operator    string             `json:"operator" bson:"operator"`
-	Description string             `json:"description" bson:"description"`
-	CreatedAt   time.Time          `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   time.Time          `json:"updatedAt" bson:"updatedAt"`
+	ID           string                  `json:"id" bson:"_id,omitempty"`
+	ConfigID     string                  `json:"configId" bson:"configId"`
+	ProjectID    string                  `json:"projectId" bson:"projectId"`
+	ProjectName  string                  `json:"projectName" bson:"projectName"`
+	Environment  string                  `json:"environment" bson:"environment"`
+	Version      string                  `json:"version" bson:"version"`
+	Rules        []GrayReleaseRule       `json:"rules" bson:"rules"`
+	StrategyType string                  `json:"strategyType,omitempty" bson:"strategyType,omitempty"`
+	Strategies   []GrayReleaseStrategy   `json:"strategies,omitempty" bson:"strategies,omitempty"`
+	RuleLogic    string                  `json:"ruleLogic,omitempty" bson:"ruleLogic,omitempty"`
+	Stage        int                     `json:"stage,omitempty" bson:"stage,omitempty"`
+	Status       string                  `json:"status" bson:"status"`
+	Operator     string                  `json:"operator" bson:"operator"`
+	Description  string                  `json:"description" bson:"description"`
+	CreatedAt    time.Time               `json:"createdAt" bson:"createdAt"`
+	UpdatedAt    time.Time               `json:"updatedAt" bson:"updatedAt"`
 }
 
 type DeviceGrayStatus struct {
