@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>监控面板 - 智能发布控制台</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; }
@@ -14,11 +15,10 @@
         .menu-item:hover { background: #e6f7ff; }
         .menu-item.active { background: #1890ff; color: white; }
         .content { flex: 1; padding: 24px; background: #fff; margin: 24px; }
-        .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
-        .metric-card { padding: 24px; background: #fafafa; border-radius: 8px; }
-        .metric-value { font-size: 32px; font-weight: bold; color: #1890ff; }
-        .metric-title { color: #666; margin-bottom: 8px; }
-        select { padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+        .charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px; }
+        .chart-card { padding: 24px; background: #fafafa; border-radius: 8px; }
+        .chart-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 16px; }
+        select { padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
@@ -31,52 +31,118 @@
             <a href="/config" class="menu-item">配置管理</a>
         </div>
         <div class="content">
-            <select id="releaseSelect" onchange="loadMetrics()">
+            <select id="releaseSelect" onchange="loadCharts()">
                 <option value="">选择发布任务</option>
                 <option value="release-1">Release v1.0.0</option>
                 <option value="release-2">Release v1.1.0</option>
             </select>
 
-            <div class="metrics">
-                <div class="metric-card">
-                    <div class="metric-title">请求速率 (req/s)</div>
-                    <div class="metric-value" id="requestRate">--</div>
+            <div class="charts">
+                <div class="chart-card">
+                    <div class="chart-title">请求速率 (req/s)</div>
+                    <canvas id="requestRateChart"></canvas>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-title">错误率 (%)</div>
-                    <div class="metric-value" id="errorRate">--</div>
+                <div class="chart-card">
+                    <div class="chart-title">错误率 (%)</div>
+                    <canvas id="errorRateChart"></canvas>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-title">P50 延迟 (ms)</div>
-                    <div class="metric-value" id="latencyP50">--</div>
+                <div class="chart-card">
+                    <div class="chart-title">P50 延迟 (ms)</div>
+                    <canvas id="latencyP50Chart"></canvas>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-title">P99 延迟 (ms)</div>
-                    <div class="metric-value" id="latencyP99">--</div>
+                <div class="chart-card">
+                    <div class="chart-title">P99 延迟 (ms)</div>
+                    <canvas id="latencyP99Chart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        function loadMetrics() {
+        let charts = {};
+
+        function createChart(canvasId, label, color) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            return new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: label,
+                        data: [],
+                        borderColor: color,
+                        backgroundColor: color + '20',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '时间'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function initCharts() {
+            charts.requestRate = createChart('requestRateChart', '请求速率', '#1890ff');
+            charts.errorRate = createChart('errorRateChart', '错误率', '#f5222d');
+            charts.latencyP50 = createChart('latencyP50Chart', 'P50延迟', '#52c41a');
+            charts.latencyP99 = createChart('latencyP99Chart', 'P99延迟', '#faad14');
+        }
+
+        function updateChart(chart, dataPoints) {
+            const labels = dataPoints.map(dp => {
+                const date = new Date(dp.timestamp * 1000);
+                return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            });
+            const values = dataPoints.map(dp => dp.value);
+
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = values;
+            chart.update();
+        }
+
+        function loadCharts() {
             const releaseId = document.getElementById('releaseSelect').value;
             if (!releaseId) return;
 
-            fetch(`/api/v1/monitoring/realtime?releaseId=${releaseId}`)
+            fetch(`/api/v1/monitoring/timeseries?releaseId=${releaseId}`)
                 .then(res => res.json())
                 .then(data => {
-                    const metrics = data.data.metrics;
-                    document.getElementById('requestRate').textContent = metrics.requestRate.toFixed(0);
-                    document.getElementById('errorRate').textContent = (metrics.errorRate * 100).toFixed(3);
-                    document.getElementById('latencyP50').textContent = metrics.latencyP50.toFixed(0);
-                    document.getElementById('latencyP99').textContent = metrics.latencyP99.toFixed(0);
+                    const timeSeries = data.data.timeSeries;
+                    updateChart(charts.requestRate, timeSeries.requestRate);
+                    updateChart(charts.errorRate, timeSeries.errorRate.map(dp => ({
+                        timestamp: dp.timestamp,
+                        value: (dp.value * 100).toFixed(3)
+                    })));
+                    updateChart(charts.latencyP50, timeSeries.latencyP50);
+                    updateChart(charts.latencyP99, timeSeries.latencyP99);
                 });
         }
 
+        initCharts();
+
         setInterval(() => {
             const releaseId = document.getElementById('releaseSelect').value;
-            if (releaseId) loadMetrics();
+            if (releaseId) loadCharts();
         }, 5000);
     </script>
 </body>

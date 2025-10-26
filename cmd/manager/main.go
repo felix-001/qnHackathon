@@ -78,6 +78,7 @@ func main() {
 		api.POST("/releases/:id/deploy", releaseHandler.Deploy)
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
+		api.GET("/monitoring/timeseries", monitoringHandler.GetTimeSeries)
 
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)
