@@ -134,7 +134,14 @@
             } else if (release.status === 'approved') {
                 return `<button class="btn" onclick="deployRelease('${release.id}')">发布</button>`;
             } else if (release.status === 'completed') {
-                return `<button class="btn btn-danger" onclick="rollback('${release.id}')">回滚</button>`;
+                return `
+                    <div class="action-buttons">
+                        <button class="btn-rollback" onclick="rollback('${release.id}')">回滚</button>
+                        <button class="btn-full-release" onclick="fullRelease('${release.id}')">全量</button>
+                        <button class="btn-gray-release" onclick="grayRelease('${release.id}')">灰度</button>
+                        <button class="btn-more" onclick="showMoreMenu('${release.id}', event)">更多</button>
+                    </div>
+                `;
             }
             return '';
         }
@@ -346,6 +353,191 @@
                     alert('删除失败: ' + err.message);
                 });
             }
+        }
+
+        function fullRelease(id) {
+            const release = currentReleases.find(r => r.id === id);
+            if (!release) return;
+            
+            if (confirm(`确认对版本 ${release.version} 执行全量发布?`)) {
+                fetch('/api/v1/gray-releases/full-release', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        releaseId: id,
+                        projectId: release.projectId,
+                        environment: release.environment,
+                        version: release.version,
+                        strategy: release.strategy,
+                        description: '全量发布',
+                        operator: 'admin'
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 200 || data.code === 0) {
+                        alert('✅ 全量发布成功');
+                        loadReleases();
+                    } else {
+                        alert('❌ 全量发布失败: ' + (data.message || '未知错误'));
+                    }
+                })
+                .catch(err => {
+                    alert('❌ 全量发布失败: ' + err.message);
+                });
+            }
+        }
+
+        function grayRelease(id) {
+            const release = currentReleases.find(r => r.id === id);
+            if (!release) return;
+            
+            const percentage = prompt('请输入灰度发布百分比 (1-100):', '10');
+            if (percentage === null) return;
+            
+            const pct = parseInt(percentage);
+            if (isNaN(pct) || pct < 1 || pct > 100) {
+                alert('❌ 请输入有效的百分比 (1-100)');
+                return;
+            }
+            
+            const config = {
+                releaseId: id,
+                projectId: release.projectId,
+                environment: release.environment,
+                version: release.version,
+                name: `${release.version} 灰度发布`,
+                rules: [
+                    {
+                        type: 'percentage',
+                        value: pct
+                    }
+                ],
+                autoPromote: false,
+                status: 'active',
+                createdAt: new Date().toISOString()
+            };
+            
+            fetch('/api/v1/gray-releases', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 200 || data.code === 0) {
+                    alert(`✅ 灰度发布配置创建成功 (${pct}% 设备)`);
+                    loadReleases();
+                } else {
+                    alert('❌ 灰度发布配置创建失败: ' + (data.message || '未知错误'));
+                }
+            })
+            .catch(err => {
+                alert('❌ 灰度发布配置创建失败: ' + err.message);
+            });
+        }
+
+        function showMoreMenu(id, event) {
+            event.stopPropagation();
+            
+            const existingMenu = document.getElementById('moreMenu');
+            if (existingMenu) {
+                existingMenu.remove();
+            }
+            
+            const release = currentReleases.find(r => r.id === id);
+            if (!release) return;
+            
+            const menu = document.createElement('div');
+            menu.id = 'moreMenu';
+            menu.className = 'more-menu';
+            
+            const rect = event.target.getBoundingClientRect();
+            menu.style.left = rect.left + 'px';
+            menu.style.top = (rect.bottom + 5) + 'px';
+            
+            const menuItems = [
+                { icon: '📋', label: '查看详情', action: () => alert('版本详情:\n' + JSON.stringify(release, null, 2)) },
+                { icon: '📑', label: '复制版本', action: () => copyRelease(id) },
+                { icon: '🔍', label: '对比版本', action: () => alert('对比版本功能开发中...') },
+                { icon: '📝', label: '查看部署日志', action: () => alert('部署日志:\n发布时间: ' + new Date(release.createdAt).toLocaleString()) },
+                { icon: '✏️', label: '编辑版本信息', action: () => editRelease(id) },
+                { divider: true },
+                { icon: '💾', label: '导出版本报告', action: () => exportRelease(id) }
+            ];
+            
+            menuItems.forEach(item => {
+                if (item.divider) {
+                    const divider = document.createElement('div');
+                    divider.className = 'more-menu-divider';
+                    menu.appendChild(divider);
+                } else {
+                    const menuItem = document.createElement('div');
+                    menuItem.className = 'more-menu-item';
+                    menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
+                    menuItem.onclick = () => {
+                        item.action();
+                        menu.remove();
+                    };
+                    menu.appendChild(menuItem);
+                }
+            });
+            
+            document.body.appendChild(menu);
+            
+            const closeMenu = (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu), 0);
+        }
+
+        function copyRelease(id) {
+            const release = currentReleases.find(r => r.id === id);
+            if (!release) return;
+            
+            document.getElementById('modalTitle').textContent = '复制发布任务';
+            loadProjects();
+            setTimeout(() => {
+                document.querySelector('select[name="projectId"]').value = release.projectId || '';
+                document.querySelector('input[name="applicationId"]').value = release.applicationId || '';
+                document.querySelector('input[name="version"]').value = release.version + '-copy';
+                document.querySelector('select[name="environment"]').value = release.environment || '';
+                document.querySelector('select[name="strategy"]').value = release.strategy || '';
+                document.querySelector('textarea[name="description"]').value = '复制自: ' + release.version;
+                document.getElementById('modal').classList.add('active');
+            }, 100);
+        }
+
+        function exportRelease(id) {
+            const release = currentReleases.find(r => r.id === id);
+            if (!release) return;
+            
+            const report = `
+版本发布报告
+============
+
+项目名称: ${release.projectName || release.projectId}
+版本号: ${release.version}
+环境: ${release.environment}
+策略: ${release.strategy}
+状态: ${release.status}
+发布人: ${release.scheduler}
+创建时间: ${new Date(release.createdAt).toLocaleString()}
+构建包: ${release.tarFileName || '无'}
+GitLab PR: ${release.gitlabPrUrl || '无'}
+描述: ${release.description || '无'}
+            `.trim();
+            
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `release-${release.version}-report.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         loadReleases();
