@@ -44,6 +44,7 @@ func main() {
 
 	r.Use(cors.Default())
 
+	r.Static("/static", "./web/static")
 	r.LoadHTMLGlob("web/templates/*.html")
 
 	projectService := service.NewProjectService(mongodb)
