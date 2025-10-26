@@ -70,6 +70,22 @@
                     <div class="chart-title">P99 延迟 (ms)</div>
                     <canvas id="latencyP99Chart"></canvas>
                 </div>
+                <div class="chart-card">
+                    <div class="chart-title">CPU 使用率 (%)</div>
+                    <canvas id="cpuUsageChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">内存使用率 (%)</div>
+                    <canvas id="memoryUsageChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">文件描述符数量</div>
+                    <canvas id="fdCountChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">连接数</div>
+                    <canvas id="connCountChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -120,6 +136,10 @@
             charts.errorRate = createChart('errorRateChart', '错误率');
             charts.latencyP50 = createChart('latencyP50Chart', 'P50延迟');
             charts.latencyP99 = createChart('latencyP99Chart', 'P99延迟');
+            charts.cpuUsage = createChart('cpuUsageChart', 'CPU使用率');
+            charts.memoryUsage = createChart('memoryUsageChart', '内存使用率');
+            charts.fdCount = createChart('fdCountChart', '文件描述符数量');
+            charts.connCount = createChart('connCountChart', '连接数');
         }
 
         async function loadProjects() {
@@ -240,6 +260,10 @@
                 updateChart(charts.errorRate, {}, 'errorRate');
                 updateChart(charts.latencyP50, {}, 'latencyP50');
                 updateChart(charts.latencyP99, {}, 'latencyP99');
+                updateChart(charts.cpuUsage, {}, 'cpuUsage');
+                updateChart(charts.memoryUsage, {}, 'memoryUsage');
+                updateChart(charts.fdCount, {}, 'fdCount');
+                updateChart(charts.connCount, {}, 'connCount');
                 return;
             }
 
@@ -247,6 +271,10 @@
             const allErrorRate = {};
             const allLatencyP50 = {};
             const allLatencyP99 = {};
+            const allCPUUsage = {};
+            const allMemoryUsage = {};
+            const allFDCount = {};
+            const allConnCount = {};
 
             try {
                 for (const releaseId of selectedReleases) {
@@ -258,6 +286,10 @@
                         allErrorRate[releaseId] = timeSeries.errorRate;
                         allLatencyP50[releaseId] = timeSeries.latencyP50;
                         allLatencyP99[releaseId] = timeSeries.latencyP99;
+                        allCPUUsage[releaseId] = timeSeries.cpuUsage;
+                        allMemoryUsage[releaseId] = timeSeries.memoryUsage;
+                        allFDCount[releaseId] = timeSeries.fdCount;
+                        allConnCount[releaseId] = timeSeries.connCount;
                     }
                 }
 
@@ -265,6 +297,10 @@
                 updateChart(charts.errorRate, allErrorRate, 'errorRate');
                 updateChart(charts.latencyP50, allLatencyP50, 'latencyP50');
                 updateChart(charts.latencyP99, allLatencyP99, 'latencyP99');
+                updateChart(charts.cpuUsage, allCPUUsage, 'cpuUsage');
+                updateChart(charts.memoryUsage, allMemoryUsage, 'memoryUsage');
+                updateChart(charts.fdCount, allFDCount, 'fdCount');
+                updateChart(charts.connCount, allConnCount, 'connCount');
             } catch (error) {
                 console.error('加载监控数据失败:', error);
             }
