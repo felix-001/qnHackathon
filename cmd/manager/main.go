@@ -49,7 +49,7 @@ func main() {
 
 	projectService := service.NewProjectService(mongodb)
 	releaseService := service.NewReleaseService(mongodb)
-	monitoringService := service.NewMonitoringService()
+	monitoringService := service.NewMonitoringService(mongodb)
 	binService := service.NewBinService()
 	configService := service.NewConfigService(mongodb)
 	grayReleaseService := service.NewGrayReleaseService(mongodb)
@@ -89,6 +89,8 @@ func main() {
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
 		api.GET("/monitoring/timeseries", monitoringHandler.GetTimeSeries)
+		api.GET("/monitoring/nodes", monitoringHandler.GetNodesByProject)
+		api.GET("/monitoring/node", monitoringHandler.GetNodeMetrics)
 
 		api.GET("/configs", configHandler.List)
 		api.POST("/configs", configHandler.Create)

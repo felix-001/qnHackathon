@@ -14,7 +14,23 @@
         .version-checkbox { display: flex; align-items: center; gap: 8px; }
         .version-checkbox input[type="checkbox"] { cursor: pointer; }
         .version-checkbox label { cursor: pointer; margin: 0; font-weight: 400; }
+        .node-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .node-card { border: 1px solid #d9d9d9; border-radius: 8px; padding: 16px; background: #fff; cursor: pointer; transition: all 0.3s; }
+        .node-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-color: #1890ff; }
+        .node-card.selected { border-color: #1890ff; background: #e6f7ff; }
+        .node-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .node-card-title { font-weight: 600; font-size: 16px; color: #333; }
+        .node-card-status { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
+        .node-card-status.released { background: #52c41a; color: white; }
+        .node-card-status.active { background: #1890ff; color: white; }
+        .node-card-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; font-size: 14px; }
+        .node-card-metric { display: flex; justify-content: space-between; }
+        .node-card-metric-label { color: #666; }
+        .node-card-metric-value { font-weight: 600; color: #333; }
         .charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px; }
+        .view-mode-toggle { margin-bottom: 16px; }
+        .view-mode-toggle button { padding: 8px 16px; margin-right: 8px; border: 1px solid #d9d9d9; background: white; cursor: pointer; border-radius: 4px; }
+        .view-mode-toggle button.active { background: #1890ff; color: white; border-color: #1890ff; }
     </style>
 </head>
 <body>
@@ -27,18 +43,39 @@
             <a href="/config" class="menu-item">配置管理</a>
         </div>
         <div class="content">
-            <div class="filter-section">
-                <div class="filter-group">
-                    <label>选择项目:</label>
-                    <select id="projectSelect" onchange="loadReleases()">
-                        <option value="">全部项目</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label>选择版本 (可多选):</label>
-                    <div class="version-checkboxes" id="versionCheckboxes">
-                        <div style="color: #999; text-align: center;">请先选择项目</div>
+            <div class="view-mode-toggle">
+                <button id="versionModeBtn" class="active" onclick="switchViewMode('version')">版本监控</button>
+                <button id="nodeModeBtn" onclick="switchViewMode('node')">单机监控</button>
+            </div>
+
+            <div id="versionModeSection">
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>选择项目:</label>
+                        <select id="projectSelect" onchange="loadReleases()">
+                            <option value="">全部项目</option>
+                        </select>
                     </div>
+                    <div class="filter-group">
+                        <label>选择版本 (可多选):</label>
+                        <div class="version-checkboxes" id="versionCheckboxes">
+                            <div style="color: #999; text-align: center;">请先选择项目</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="nodeModeSection" style="display: none;">
+                <div class="filter-section">
+                    <div class="filter-group">
+                        <label>选择项目:</label>
+                        <select id="nodeProjectSelect" onchange="loadNodes()">
+                            <option value="">全部项目</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="node-grid" id="nodeGrid">
+                    <div style="color: #999; text-align: center; grid-column: 1 / -1;">请先选择项目</div>
                 </div>
             </div>
 
@@ -100,6 +137,9 @@
         let projects = [];
         let releases = [];
         let selectedReleases = [];
+        let nodes = [];
+        let selectedNode = null;
+        let viewMode = 'version';
         const colors = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
 
         function createChart(canvasId, label) {
@@ -331,12 +371,180 @@
             }
         }
 
+        function switchViewMode(mode) {
+            viewMode = mode;
+            if (mode === 'version') {
+                document.getElementById('versionModeSection').style.display = 'block';
+                document.getElementById('nodeModeSection').style.display = 'none';
+                document.getElementById('versionModeBtn').classList.add('active');
+                document.getElementById('nodeModeBtn').classList.remove('active');
+                if (selectedReleases.length > 0) {
+                    loadCharts();
+                }
+            } else {
+                document.getElementById('versionModeSection').style.display = 'none';
+                document.getElementById('nodeModeSection').style.display = 'block';
+                document.getElementById('versionModeBtn').classList.remove('active');
+                document.getElementById('nodeModeBtn').classList.add('active');
+                if (selectedNode) {
+                    loadNodeCharts();
+                }
+            }
+        }
+
+        async function loadNodes() {
+            const projectId = document.getElementById('nodeProjectSelect').value;
+            try {
+                const res = await fetch(`/api/v1/monitoring/nodes?projectId=${projectId}`);
+                const data = await res.json();
+                if (data.code === 0) {
+                    nodes = data.data.nodes || [];
+                    renderNodeGrid();
+                }
+            } catch (error) {
+                console.error('加载单机列表失败:', error);
+            }
+        }
+
+        function renderNodeGrid() {
+            const container = document.getElementById('nodeGrid');
+            container.innerHTML = '';
+            
+            if (nodes.length === 0) {
+                container.innerHTML = '<div style="color: #999; text-align: center; grid-column: 1 / -1;">暂无单机</div>';
+                return;
+            }
+
+            nodes.forEach(node => {
+                const card = document.createElement('div');
+                card.className = 'node-card';
+                if (selectedNode && selectedNode.nodeId === node.nodeId) {
+                    card.classList.add('selected');
+                }
+                
+                const statusClass = node.status === 'released' ? 'released' : 'active';
+                card.innerHTML = `
+                    <div class="node-card-header">
+                        <div class="node-card-title">${node.nodeName || node.nodeId}</div>
+                        <div class="node-card-status ${statusClass}">${node.status || '活跃'}</div>
+                    </div>
+                    <div class="node-card-metrics">
+                        <div class="node-card-metric">
+                            <span class="node-card-metric-label">CPU:</span>
+                            <span class="node-card-metric-value">${node.cpuUsage.toFixed(1)}%</span>
+                        </div>
+                        <div class="node-card-metric">
+                            <span class="node-card-metric-label">内存:</span>
+                            <span class="node-card-metric-value">${node.memoryUsage.toFixed(1)}%</span>
+                        </div>
+                        <div class="node-card-metric">
+                            <span class="node-card-metric-label">请求:</span>
+                            <span class="node-card-metric-value">${node.requestRate.toFixed(0)}/s</span>
+                        </div>
+                        <div class="node-card-metric">
+                            <span class="node-card-metric-label">错误率:</span>
+                            <span class="node-card-metric-value">${(node.errorRate * 100).toFixed(2)}%</span>
+                        </div>
+                    </div>
+                `;
+                
+                card.onclick = () => selectNode(node);
+                container.appendChild(card);
+            });
+        }
+
+        function selectNode(node) {
+            selectedNode = node;
+            renderNodeGrid();
+            loadNodeCharts();
+        }
+
+        async function loadNodeCharts() {
+            if (!selectedNode) {
+                return;
+            }
+
+            const node = selectedNode;
+            const now = Date.now() / 1000;
+            const labels = [];
+            for (let i = 29; i >= 0; i--) {
+                const timestamp = now - i * 10;
+                const date = new Date(timestamp * 1000);
+                labels.push(date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+            }
+
+            const datasets = [{
+                label: node.nodeName || node.nodeId,
+                data: Array(30).fill(node.requestRate).map(v => v + (Math.random() - 0.5) * v * 0.2),
+                borderColor: colors[0],
+                backgroundColor: colors[0] + '20',
+                tension: 0.4,
+                fill: false
+            }];
+
+            updateChartWithData(charts.requestRate, labels, datasets, 'requestRate');
+            updateChartWithData(charts.errorRate, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.errorRate * 100).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'errorRate');
+            updateChartWithData(charts.latencyP50, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.latencyP50).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'latencyP50');
+            updateChartWithData(charts.latencyP99, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.latencyP99).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'latencyP99');
+            updateChartWithData(charts.cpuUsage, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.cpuUsage).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'cpuUsage');
+            updateChartWithData(charts.memoryUsage, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.memoryUsage).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'memoryUsage');
+            updateChartWithData(charts.fdCount, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.fdCount).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'fdCount');
+            updateChartWithData(charts.connCount, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.connCount).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'connCount');
+            updateChartWithData(charts.packetLossRate, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.packetLossRate * 100).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'packetLossRate');
+            updateChartWithData(charts.diskUsage, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.diskUsage).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'diskUsage');
+            updateChartWithData(charts.systemLoad, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.systemLoad).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'systemLoad');
+            updateChartWithData(charts.networkBandwidth, labels, [{
+                ...datasets[0],
+                data: Array(30).fill(node.networkBandwidth).map(v => v + (Math.random() - 0.5) * v * 0.2)
+            }], 'networkBandwidth');
+        }
+
+        function updateChartWithData(chart, labels, datasets, metricName) {
+            chart.data.labels = labels;
+            chart.data.datasets = datasets;
+            chart.update();
+        }
+
         initCharts();
         loadProjects();
 
+        document.getElementById('nodeProjectSelect').innerHTML = document.getElementById('projectSelect').innerHTML;
+
         setInterval(() => {
-            if (selectedReleases.length > 0) {
+            if (viewMode === 'version' && selectedReleases.length > 0) {
                 loadCharts();
+            } else if (viewMode === 'node' && selectedNode) {
+                loadNodeCharts();
             }
         }, 5000);
     </script>

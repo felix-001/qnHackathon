@@ -144,6 +144,27 @@ type MonitoringTimeSeries struct {
 	NetworkBandwidth []MetricDataPoint `json:"networkBandwidth"`
 }
 
+type NodeMonitoringMetrics struct {
+	NodeID           string  `json:"nodeId"`
+	NodeName         string  `json:"nodeName"`
+	ProjectID        string  `json:"projectId"`
+	ProjectName      string  `json:"projectName"`
+	RequestRate      float64 `json:"requestRate"`
+	ErrorRate        float64 `json:"errorRate"`
+	LatencyP50       float64 `json:"latencyP50"`
+	LatencyP95       float64 `json:"latencyP95"`
+	LatencyP99       float64 `json:"latencyP99"`
+	CPUUsage         float64 `json:"cpuUsage"`
+	MemoryUsage      float64 `json:"memoryUsage"`
+	FDCount          float64 `json:"fdCount"`
+	ConnCount        float64 `json:"connCount"`
+	PacketLossRate   float64 `json:"packetLossRate"`
+	DiskUsage        float64 `json:"diskUsage"`
+	SystemLoad       float64 `json:"systemLoad"`
+	NetworkBandwidth float64 `json:"networkBandwidth"`
+	Status           string  `json:"status"`
+}
+
 type Response struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
