@@ -53,11 +53,13 @@ func main() {
 	binService := service.NewBinService()
 	configService := service.NewConfigService(mongodb)
 	grayReleaseService := service.NewGrayReleaseService(mongodb)
+	machineService := service.NewMachineService(mongodb)
 
 	projectHandler := handler.NewProjectHandler(projectService)
 	releaseHandler := handler.NewReleaseHandler(releaseService, mgr, projectService)
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	binHandler := handler.NewBinHandler(binService)
+	machineHandler := handler.NewMachineHandler(machineService)
 	gitlabMgr := service.NewGitLabMgr(cfg.GitlabConf)
 	binHandler.SetGitLabMgr(gitlabMgr)
 	binHandler.SetReleaseService(releaseService)
@@ -89,6 +91,8 @@ func main() {
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
 		api.GET("/monitoring/timeseries", monitoringHandler.GetTimeSeries)
+
+		api.GET("/machines", machineHandler.ListByProject)
 
 		api.GET("/configs", configHandler.List)
 		api.POST("/configs", configHandler.Create)

@@ -223,3 +223,13 @@ type GrayReleaseStats struct {
 	DeviceCount  int               `json:"deviceCount"`
 	ByDimension  map[string]int    `json:"byDimension"`
 }
+
+type Machine struct {
+	ID        string    `json:"id" bson:"_id,omitempty"`
+	ProjectID string    `json:"projectId" bson:"projectId"`
+	IP        string    `json:"ip" bson:"ip"`
+	Hostname  string    `json:"hostname" bson:"hostname"`
+	Status    string    `json:"status" bson:"status"`
+	CreatedAt time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt" bson:"updatedAt"`
+}
