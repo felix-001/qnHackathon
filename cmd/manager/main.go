@@ -17,7 +17,7 @@ import (
 
 func main() {
 	util.InitLogger()
-	
+
 	configFile := flag.String("f", "./config/manager.json", "the config file")
 	flag.Parse()
 	cfg := &cfg.Config{}
@@ -118,6 +118,7 @@ func main() {
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)
 		api.GET("/bins/:bin_name", binHandler.GetBin)
+		api.GET("/bins", binHandler.GetBins)
 		api.POST("/bins/:bin_name", binHandler.PostBin)
 		api.POST("/bins/:bin_name/progress", binHandler.PostProgress)
 		api.GET("/download/:bin_file_name", binHandler.Download)

@@ -253,3 +253,9 @@ func (h *BinHandler) Health(c *gin.Context) {
 		"bins_count":  h.binService.GetBinsCount(),
 	})
 }
+
+func (h *BinHandler) GetBins(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"bins": []string{"streamd"},
+	})
+}
