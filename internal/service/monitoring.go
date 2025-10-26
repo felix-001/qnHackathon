@@ -14,15 +14,19 @@ func NewMonitoringService() *MonitoringService {
 
 func (s *MonitoringService) GetRealtime(releaseID string) (*model.MonitoringMetrics, error) {
 	return &model.MonitoringMetrics{
-		RequestRate: float64(rand.Intn(2000)),
-		ErrorRate:   rand.Float64() * 0.01,
-		LatencyP50:  float64(rand.Intn(100)),
-		LatencyP95:  float64(rand.Intn(300)),
-		LatencyP99:  float64(rand.Intn(500)),
-		CPUUsage:    float64(rand.Intn(100)),
-		MemoryUsage: float64(rand.Intn(100)),
-		FDCount:     float64(100 + rand.Intn(900)),
-		ConnCount:   float64(50 + rand.Intn(950)),
+		RequestRate:      float64(rand.Intn(2000)),
+		ErrorRate:        rand.Float64() * 0.01,
+		LatencyP50:       float64(rand.Intn(100)),
+		LatencyP95:       float64(rand.Intn(300)),
+		LatencyP99:       float64(rand.Intn(500)),
+		CPUUsage:         float64(rand.Intn(100)),
+		MemoryUsage:      float64(rand.Intn(100)),
+		FDCount:          float64(100 + rand.Intn(900)),
+		ConnCount:        float64(50 + rand.Intn(950)),
+		PacketLossRate:   rand.Float64() * 0.05,
+		DiskUsage:        float64(40 + rand.Intn(50)),
+		SystemLoad:       rand.Float64() * 8.0,
+		NetworkBandwidth: float64(10 + rand.Intn(90)),
 	}, nil
 }
 
@@ -38,6 +42,11 @@ func (s *MonitoringService) GetTimeSeries(releaseID string) (*model.MonitoringTi
 	memoryUsage := make([]model.MetricDataPoint, dataPoints)
 	fdCount := make([]model.MetricDataPoint, dataPoints)
 	connCount := make([]model.MetricDataPoint, dataPoints)
+
+	packetLossRate := make([]model.MetricDataPoint, dataPoints)
+	diskUsage := make([]model.MetricDataPoint, dataPoints)
+	systemLoad := make([]model.MetricDataPoint, dataPoints)
+	networkBandwidth := make([]model.MetricDataPoint, dataPoints)
 
 	for i := 0; i < dataPoints; i++ {
 		timestamp := now - int64((dataPoints-i-1)*10)
@@ -73,16 +82,36 @@ func (s *MonitoringService) GetTimeSeries(releaseID string) (*model.MonitoringTi
 			Timestamp: timestamp,
 			Value:     float64(50 + rand.Intn(950)),
 		}
+		packetLossRate[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     rand.Float64() * 0.05,
+		}
+		diskUsage[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     float64(40 + rand.Intn(50)),
+		}
+		systemLoad[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     rand.Float64() * 8.0,
+		}
+		networkBandwidth[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     float64(10 + rand.Intn(90)),
+		}
 	}
 
 	return &model.MonitoringTimeSeries{
-		RequestRate: requestRate,
-		ErrorRate:   errorRate,
-		LatencyP50:  latencyP50,
-		LatencyP99:  latencyP99,
-		CPUUsage:    cpuUsage,
-		MemoryUsage: memoryUsage,
-		FDCount:     fdCount,
-		ConnCount:   connCount,
+		RequestRate:      requestRate,
+		ErrorRate:        errorRate,
+		LatencyP50:       latencyP50,
+		LatencyP99:       latencyP99,
+		CPUUsage:         cpuUsage,
+		MemoryUsage:      memoryUsage,
+		FDCount:          fdCount,
+		ConnCount:        connCount,
+		PacketLossRate:   packetLossRate,
+		DiskUsage:        diskUsage,
+		SystemLoad:       systemLoad,
+		NetworkBandwidth: networkBandwidth,
 	}, nil
 }
