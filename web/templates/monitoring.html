@@ -30,8 +30,14 @@
             <div class="filter-section">
                 <div class="filter-group">
                     <label>选择项目:</label>
-                    <select id="projectSelect" onchange="loadReleases()">
+                    <select id="projectSelect" onchange="onProjectChange()">
                         <option value="">全部项目</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>选择机器 (IP/ID):</label>
+                    <select id="machineSelect" onchange="onMachineChange()">
+                        <option value="">全部机器</option>
                     </select>
                 </div>
                 <div class="filter-group">
@@ -99,7 +105,9 @@
         let charts = {};
         let projects = [];
         let releases = [];
+        let machines = [];
         let selectedReleases = [];
+        let selectedMachine = '';
         const colors = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
 
         function createChart(canvasId, label) {
@@ -167,6 +175,38 @@
                 }
             } catch (error) {
                 console.error('加载项目失败:', error);
+            }
+        }
+
+        async function onProjectChange() {
+            const projectId = document.getElementById('projectSelect').value;
+            await loadMachines(projectId);
+            await loadReleases();
+        }
+
+        async function onMachineChange() {
+            selectedMachine = document.getElementById('machineSelect').value;
+            loadCharts();
+        }
+
+        async function loadMachines(projectId) {
+            try {
+                const url = projectId ? `/api/v1/machines?projectId=${projectId}` : '/api/v1/machines';
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data.code === 0) {
+                    machines = data.data || [];
+                    const select = document.getElementById('machineSelect');
+                    select.innerHTML = '<option value="">全部机器</option>';
+                    machines.forEach(machine => {
+                        const option = document.createElement('option');
+                        option.value = machine.id;
+                        option.textContent = `${machine.hostname} (${machine.ip})`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('加载机器列表失败:', error);
             }
         }
 
@@ -295,7 +335,11 @@
 
             try {
                 for (const releaseId of selectedReleases) {
-                    const res = await fetch(`/api/v1/monitoring/timeseries?releaseId=${releaseId}`);
+                    let url = `/api/v1/monitoring/timeseries?releaseId=${releaseId}`;
+                    if (selectedMachine) {
+                        url += `&machineId=${selectedMachine}`;
+                    }
+                    const res = await fetch(url);
                     const data = await res.json();
                     if (data.code === 0) {
                         const timeSeries = data.data.timeSeries;

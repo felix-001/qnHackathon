@@ -18,7 +18,8 @@ func NewMonitoringHandler(service *service.MonitoringService) *MonitoringHandler
 
 func (h *MonitoringHandler) GetRealtime(c *gin.Context) {
 	releaseID := c.Query("releaseId")
-	metrics, err := h.service.GetRealtime(releaseID)
+	machineID := c.Query("machineId")
+	metrics, err := h.service.GetRealtime(releaseID, machineID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
 			Code:    1,
@@ -38,7 +39,8 @@ func (h *MonitoringHandler) GetRealtime(c *gin.Context) {
 
 func (h *MonitoringHandler) GetTimeSeries(c *gin.Context) {
 	releaseID := c.Query("releaseId")
-	timeSeries, err := h.service.GetTimeSeries(releaseID)
+	machineID := c.Query("machineId")
+	timeSeries, err := h.service.GetTimeSeries(releaseID, machineID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
 			Code:    1,
