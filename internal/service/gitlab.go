@@ -258,3 +258,71 @@ func (s *GitLabMgr) GetMrUrl(expectedTitle string) string {
 
 	return ""
 }
+
+func (s *GitLabMgr) CreateOrUpdateFile(filePath, content, branch, commitMessage string) error {
+	master := "master"
+	
+	if branch == "" {
+		branch = s.CreateBranch("config")
+		if branch == "" {
+			return fmt.Errorf("failed to create branch")
+		}
+	}
+
+	_, resp, err := s.Client.RepositoryFiles.GetFile(
+		s.Conf.ProjectID,
+		filePath,
+		&gitlab.GetFileOptions{
+			Ref: &master,
+		})
+
+	if err != nil && resp != nil && resp.StatusCode == http.StatusNotFound {
+		_, _, err = s.Client.RepositoryFiles.CreateFile(s.Conf.ProjectID,
+			filePath,
+			&gitlab.CreateFileOptions{
+				Branch:        &branch,
+				CommitMessage: &commitMessage,
+				Content:       &content,
+			})
+		if err != nil {
+			log.Logger.Error().Msgf("Failed to create file: %v", err)
+			return err
+		}
+	} else {
+		_, _, err = s.Client.RepositoryFiles.UpdateFile(s.Conf.ProjectID,
+			filePath,
+			&gitlab.UpdateFileOptions{
+				Branch:        &branch,
+				CommitMessage: &commitMessage,
+				Content:       &content,
+			})
+		if err != nil {
+			log.Logger.Error().Msgf("Failed to update file: %v", err)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *GitLabMgr) CreateMergeRequest(sourceBranch, targetBranch, title, description string) (string, error) {
+	if targetBranch == "" {
+		targetBranch = "master"
+	}
+
+	options := &gitlab.CreateMergeRequestOptions{
+		SourceBranch: &sourceBranch,
+		TargetBranch: &targetBranch,
+		Title:        &title,
+		Description:  &description,
+	}
+
+	mr, _, err := s.Client.MergeRequests.CreateMergeRequest(s.Conf.ProjectID, options)
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to create merge request: %v", err)
+		return "", err
+	}
+
+	s.MrUrl = mr.WebURL
+	return mr.WebURL, nil
+}
