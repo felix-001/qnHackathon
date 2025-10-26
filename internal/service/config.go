@@ -114,7 +114,6 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 		ChangeType:  "create",
 		Reason:      reason,
 		Operator:    operator,
-		Approver:    config.Approver,
 		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
@@ -155,7 +154,6 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 			"content":     config.Content,
 			"description": config.Description,
 			"version":     config.Version.String(),
-			"approver":    config.Approver,
 			"updatedAt":   config.UpdatedAt,
 		},
 	}
@@ -176,7 +174,6 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 		ChangeType:  "update",
 		Reason:      reason,
 		Operator:    operator,
-		Approver:    config.Approver,
 		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
