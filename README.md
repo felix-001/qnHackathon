@@ -147,7 +147,7 @@ go run cmd/manager/main.go -f internal/config/manager.json
 semaphore 提供版本的具体的执行功能
 
 - 每个版本的部署都对应一个 semaphore 任务（资源对象）
-- 任务（以及任务的依赖）可以通过接口创建，触发，查询状态，查询结果
+- 任务（以及任务的依赖）可以通过接口创建，触发，查询状态，查询结果: bin-proxy(runner-proxy) 从 manager 获取版本任务，将任务同步为 semaphore 的任务，并执行。manager 也能直接扩展操作 semaphore 的任务。
 - 任务的依赖从 github 拉取：比如任务的执行列表，元数据，脚本等
 
 环境：
