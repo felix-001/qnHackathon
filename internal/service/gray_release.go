@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/felix-001/qnHackathon/internal/db"
@@ -307,7 +310,14 @@ func (s *GrayReleaseService) CheckDeviceGrayRule(device *model.DeviceGrayStatus)
 	}
 
 	for _, config := range configs {
-		if s.matchGrayRule(device, config.Rules) {
+		matched := false
+		if config.StrategyType == "advanced" && len(config.Strategies) > 0 {
+			matched = s.matchAdvancedStrategies(device, config.Strategies, config.RuleLogic)
+		} else if len(config.Rules) > 0 {
+			matched = s.matchGrayRule(device, config.Rules)
+		}
+
+		if matched {
 			return true, config.Version, nil
 		}
 	}
@@ -350,4 +360,140 @@ func (s *GrayReleaseService) matchGrayRule(device *model.DeviceGrayStatus, rules
 	}
 
 	return true
+}
+
+func (s *GrayReleaseService) matchAdvancedStrategies(device *model.DeviceGrayStatus, strategies []model.GrayReleaseStrategy, logic string) bool {
+	if len(strategies) == 0 {
+		return false
+	}
+
+	if logic == "" {
+		logic = "AND"
+	}
+
+	for _, strategy := range strategies {
+		matched := s.matchSingleStrategy(device, strategy)
+
+		if logic == "OR" && matched {
+			return true
+		}
+		if logic == "AND" && !matched {
+			return false
+		}
+	}
+
+	if logic == "OR" {
+		return false
+	}
+	return true
+}
+
+func (s *GrayReleaseService) matchSingleStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	switch strategy.Type {
+	case "dimension":
+		return s.matchDimensionStrategy(device, strategy)
+	case "percentage":
+		return s.matchPercentageStrategy(device, strategy)
+	case "hash":
+		return s.matchHashStrategy(device, strategy)
+	case "whitelist":
+		return s.matchWhitelistStrategy(device, strategy)
+	case "blacklist":
+		return s.matchBlacklistStrategy(device, strategy)
+	case "time_window":
+		return s.matchTimeWindowStrategy(strategy)
+	default:
+		return false
+	}
+}
+
+func (s *GrayReleaseService) matchDimensionStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	var deviceValue string
+	switch strategy.Dimension {
+	case "isp":
+		deviceValue = device.ISP
+	case "region":
+		deviceValue = device.Region
+	case "province":
+		deviceValue = device.Province
+	case "datacenter":
+		deviceValue = device.DataCenter
+	default:
+		return false
+	}
+
+	for _, value := range strategy.Values {
+		if value == deviceValue {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *GrayReleaseService) matchPercentageStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	if strategy.Percentage <= 0 || strategy.Percentage > 100 {
+		return false
+	}
+
+	hash := sha256.Sum256([]byte(device.NodeID))
+	hashValue := hex.EncodeToString(hash[:])
+
+	numericHash := uint64(0)
+	for i := 0; i < 8 && i < len(hashValue); i++ {
+		if val, err := strconv.ParseUint(string(hashValue[i]), 16, 64); err == nil {
+			numericHash = numericHash*16 + val
+		}
+	}
+
+	threshold := uint64(strategy.Percentage) * 0xFFFFFFFFFFFFFFFF / 100
+	return numericHash <= threshold
+}
+
+func (s *GrayReleaseService) matchHashStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	var hashInput string
+	switch strategy.HashKey {
+	case "nodeId":
+		hashInput = device.NodeID
+	case "nodeName":
+		hashInput = device.NodeName
+	default:
+		return false
+	}
+
+	if hashInput == "" {
+		return false
+	}
+
+	hash := sha256.Sum256([]byte(hashInput))
+	hashValue := hex.EncodeToString(hash[:])
+
+	lastChar := hashValue[len(hashValue)-1]
+	return lastChar >= '0' && lastChar <= '7'
+}
+
+func (s *GrayReleaseService) matchWhitelistStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	for _, id := range strategy.Values {
+		if id == device.NodeID || id == device.NodeName {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *GrayReleaseService) matchBlacklistStrategy(device *model.DeviceGrayStatus, strategy model.GrayReleaseStrategy) bool {
+	for _, id := range strategy.Values {
+		if id == device.NodeID || id == device.NodeName {
+			return false
+		}
+	}
+	return true
+}
+
+func (s *GrayReleaseService) matchTimeWindowStrategy(strategy model.GrayReleaseStrategy) bool {
+	if strategy.TimeWindow == nil {
+		return false
+	}
+
+	now := time.Now()
+	return now.After(strategy.TimeWindow.StartTime) && now.Before(strategy.TimeWindow.EndTime)
 }
