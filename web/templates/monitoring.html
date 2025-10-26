@@ -70,6 +70,38 @@
                     <div class="chart-title">P99 延迟 (ms)</div>
                     <canvas id="latencyP99Chart"></canvas>
                 </div>
+                <div class="chart-card">
+                    <div class="chart-title">CPU 使用率 (%)</div>
+                    <canvas id="cpuUsageChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">内存使用率 (%)</div>
+                    <canvas id="memoryUsageChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">文件描述符数量</div>
+                    <canvas id="fdCountChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">连接数</div>
+                    <canvas id="connCountChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">丢包率 (%)</div>
+                    <canvas id="packetLossRateChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">磁盘使用率 (%)</div>
+                    <canvas id="diskUsageChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">系统负载</div>
+                    <canvas id="systemLoadChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">网络带宽使用率 (Mbps)</div>
+                    <canvas id="networkBandwidthChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
@@ -120,6 +152,14 @@
             charts.errorRate = createChart('errorRateChart', '错误率');
             charts.latencyP50 = createChart('latencyP50Chart', 'P50延迟');
             charts.latencyP99 = createChart('latencyP99Chart', 'P99延迟');
+            charts.cpuUsage = createChart('cpuUsageChart', 'CPU使用率');
+            charts.memoryUsage = createChart('memoryUsageChart', '内存使用率');
+            charts.fdCount = createChart('fdCountChart', '文件描述符数量');
+            charts.connCount = createChart('connCountChart', '连接数');
+            charts.packetLossRate = createChart('packetLossRateChart', '丢包率');
+            charts.diskUsage = createChart('diskUsageChart', '磁盘使用率');
+            charts.systemLoad = createChart('systemLoadChart', '系统负载');
+            charts.networkBandwidth = createChart('networkBandwidthChart', '网络带宽使用率');
         }
 
         async function loadProjects() {
@@ -213,7 +253,7 @@
                 const release = releases.find(r => r.id === releaseId);
                 const dataPoints = allDataPoints[releaseId] || [];
                 const values = dataPoints.map(dp => {
-                    if (metricName === 'errorRate') {
+                    if (metricName === 'errorRate' || metricName === 'packetLossRate') {
                         return (dp.value * 100).toFixed(3);
                     }
                     return dp.value;
@@ -240,6 +280,14 @@
                 updateChart(charts.errorRate, {}, 'errorRate');
                 updateChart(charts.latencyP50, {}, 'latencyP50');
                 updateChart(charts.latencyP99, {}, 'latencyP99');
+                updateChart(charts.cpuUsage, {}, 'cpuUsage');
+                updateChart(charts.memoryUsage, {}, 'memoryUsage');
+                updateChart(charts.fdCount, {}, 'fdCount');
+                updateChart(charts.connCount, {}, 'connCount');
+                updateChart(charts.packetLossRate, {}, 'packetLossRate');
+                updateChart(charts.diskUsage, {}, 'diskUsage');
+                updateChart(charts.systemLoad, {}, 'systemLoad');
+                updateChart(charts.networkBandwidth, {}, 'networkBandwidth');
                 return;
             }
 
@@ -247,6 +295,14 @@
             const allErrorRate = {};
             const allLatencyP50 = {};
             const allLatencyP99 = {};
+            const allCPUUsage = {};
+            const allMemoryUsage = {};
+            const allFDCount = {};
+            const allConnCount = {};
+            const allPacketLossRate = {};
+            const allDiskUsage = {};
+            const allSystemLoad = {};
+            const allNetworkBandwidth = {};
 
             try {
                 for (const releaseId of selectedReleases) {
@@ -258,6 +314,14 @@
                         allErrorRate[releaseId] = timeSeries.errorRate;
                         allLatencyP50[releaseId] = timeSeries.latencyP50;
                         allLatencyP99[releaseId] = timeSeries.latencyP99;
+                        allCPUUsage[releaseId] = timeSeries.cpuUsage;
+                        allMemoryUsage[releaseId] = timeSeries.memoryUsage;
+                        allFDCount[releaseId] = timeSeries.fdCount;
+                        allConnCount[releaseId] = timeSeries.connCount;
+                        allPacketLossRate[releaseId] = timeSeries.packetLossRate;
+                        allDiskUsage[releaseId] = timeSeries.diskUsage;
+                        allSystemLoad[releaseId] = timeSeries.systemLoad;
+                        allNetworkBandwidth[releaseId] = timeSeries.networkBandwidth;
                     }
                 }
 
@@ -265,6 +329,14 @@
                 updateChart(charts.errorRate, allErrorRate, 'errorRate');
                 updateChart(charts.latencyP50, allLatencyP50, 'latencyP50');
                 updateChart(charts.latencyP99, allLatencyP99, 'latencyP99');
+                updateChart(charts.cpuUsage, allCPUUsage, 'cpuUsage');
+                updateChart(charts.memoryUsage, allMemoryUsage, 'memoryUsage');
+                updateChart(charts.fdCount, allFDCount, 'fdCount');
+                updateChart(charts.connCount, allConnCount, 'connCount');
+                updateChart(charts.packetLossRate, allPacketLossRate, 'packetLossRate');
+                updateChart(charts.diskUsage, allDiskUsage, 'diskUsage');
+                updateChart(charts.systemLoad, allSystemLoad, 'systemLoad');
+                updateChart(charts.networkBandwidth, allNetworkBandwidth, 'networkBandwidth');
             } catch (error) {
                 console.error('加载监控数据失败:', error);
             }

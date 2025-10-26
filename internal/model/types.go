@@ -54,11 +54,19 @@ type ReleaseStage struct {
 }
 
 type MonitoringMetrics struct {
-	RequestRate float64 `json:"requestRate"`
-	ErrorRate   float64 `json:"errorRate"`
-	LatencyP50  float64 `json:"latencyP50"`
-	LatencyP95  float64 `json:"latencyP95"`
-	LatencyP99  float64 `json:"latencyP99"`
+	RequestRate     float64 `json:"requestRate"`
+	ErrorRate       float64 `json:"errorRate"`
+	LatencyP50      float64 `json:"latencyP50"`
+	LatencyP95      float64 `json:"latencyP95"`
+	LatencyP99      float64 `json:"latencyP99"`
+	CPUUsage        float64 `json:"cpuUsage"`
+	MemoryUsage     float64 `json:"memoryUsage"`
+	FDCount         float64 `json:"fdCount"`
+	ConnCount       float64 `json:"connCount"`
+	PacketLossRate  float64 `json:"packetLossRate"`
+	DiskUsage       float64 `json:"diskUsage"`
+	SystemLoad      float64 `json:"systemLoad"`
+	NetworkBandwidth float64 `json:"networkBandwidth"`
 }
 
 type MetricDataPoint struct {
@@ -67,10 +75,18 @@ type MetricDataPoint struct {
 }
 
 type MonitoringTimeSeries struct {
-	RequestRate []MetricDataPoint `json:"requestRate"`
-	ErrorRate   []MetricDataPoint `json:"errorRate"`
-	LatencyP50  []MetricDataPoint `json:"latencyP50"`
-	LatencyP99  []MetricDataPoint `json:"latencyP99"`
+	RequestRate      []MetricDataPoint `json:"requestRate"`
+	ErrorRate        []MetricDataPoint `json:"errorRate"`
+	LatencyP50       []MetricDataPoint `json:"latencyP50"`
+	LatencyP99       []MetricDataPoint `json:"latencyP99"`
+	CPUUsage         []MetricDataPoint `json:"cpuUsage"`
+	MemoryUsage      []MetricDataPoint `json:"memoryUsage"`
+	FDCount          []MetricDataPoint `json:"fdCount"`
+	ConnCount        []MetricDataPoint `json:"connCount"`
+	PacketLossRate   []MetricDataPoint `json:"packetLossRate"`
+	DiskUsage        []MetricDataPoint `json:"diskUsage"`
+	SystemLoad       []MetricDataPoint `json:"systemLoad"`
+	NetworkBandwidth []MetricDataPoint `json:"networkBandwidth"`
 }
 
 type Response struct {
