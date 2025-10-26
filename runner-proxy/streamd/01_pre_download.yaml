@@ -26,12 +26,15 @@
         state: directory
         mode: "0755"
 
-    - name: 下载 bin tarball 文件
+    - name: 下载 bin tarball 文件（带认证和请求头）
       ansible.builtin.get_url:
         url: "{{ bin_tar_url }}"
         dest: "{{ bin_tar_dest }}"
         mode: "0644"
-        validate_certs: no # 验证 SSL 证书，如需关闭设为 no
+        validate_certs: no
+        headers:
+          User-Agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+          Authorization: "Basic YWRtaW46ZTk5YzY2MTQ4OTMyNDdjMmFhMmI3YjFiM2Y5NjQ1MTc=" # 新增这一行
       register: bin_download_result
       retries: 3
       delay: 5
