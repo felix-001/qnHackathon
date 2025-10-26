@@ -458,4 +458,7 @@ docker run -p 38020:3000 --name semaphore \
 
 ## 许可证
 
+# 演示视频
+[bilibili.com/video/BV1DNskzjEk5/](https://www.bilibili.com/video/BV1DNskzjEk5/?vd_source=57b5c35c1f2799577cb0fdccab63d7ff)
+
 MIT License
