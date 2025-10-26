@@ -41,6 +41,7 @@
         .history-item .change-type { font-weight: bold; color: #1890ff; }
         .history-item .change-type.create { color: #52c41a; }
         .history-item .change-type.delete { color: #ff4d4f; }
+        .history-item .change-type.rollback { color: #faad14; }
         .diff { background: #fffbe6; padding: 8px; border-left: 3px solid #faad14; margin: 8px 0; font-family: monospace; font-size: 12px; }
         .action-btn { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
         .json-editor { background: #f5f5f5; padding: 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; }
@@ -188,6 +189,10 @@
                 <div class="form-group">
                     <label>操作人 <span style="color: red;">*</span></label>
                     <input type="text" id="operator" required placeholder="输入操作人姓名">
+                </div>
+                <div class="form-group">
+                    <label>审批人 <span style="color: red;">*</span></label>
+                    <input type="text" id="approver" required placeholder="输入审批人姓名">
                 </div>
                 <div class="btn-group">
                     <button type="button" class="btn" style="background: #d9d9d9; color: #333;" onclick="hideModal()">取消</button>
@@ -429,6 +434,7 @@
             const description = document.getElementById('description').value;
             const operator = document.getElementById('operator').value;
             const reason = document.getElementById('reason').value;
+            const approver = document.getElementById('approver').value;
 
             if (!projectId) {
                 alert('请选择项目');
@@ -449,7 +455,8 @@
                 projectName: projectName,
                 environment: environment,
                 content: content,
-                description: description
+                description: description,
+                approver: approver
             };
             
             const requestData = {
@@ -543,7 +550,7 @@
             updateCompareButton();
             
             container.innerHTML = history.map((item, index) => {
-                const changeTypeText = item.changeType === 'create' ? '创建' : item.changeType === 'update' ? '更新' : '删除';
+                const changeTypeText = item.changeType === 'create' ? '创建' : item.changeType === 'update' ? '更新' : item.changeType === 'rollback' ? '回滚' : '删除';
                 const changeTypeClass = item.changeType;
                 
                 let compareBtn = '';
@@ -551,8 +558,14 @@
                     compareBtn = `<button class="btn action-btn" onclick="showCompare('${item.id}', '${history[index + 1].id}')">与上一版本对比</button>`;
                 }
                 
+                let rollbackBtn = '';
+                if (item.changeType !== 'delete' && item.changeType !== 'rollback') {
+                    rollbackBtn = `<button class="btn action-btn" style="background: #faad14;" onclick="rollbackToVersion('${item.configId}', '${item.id}')">回滚到此版本</button>`;
+                }
+                
                 const checkboxDisabled = item.changeType === 'delete' ? 'disabled' : '';
                 const version = item.version || 'v1.0.0';
+                const approverInfo = item.approver ? `<div>审批人: ${item.approver}</div>` : '';
                 
                 return `
                     <div class="history-item">
@@ -562,10 +575,12 @@
                         </div>
                         <div class="time">${new Date(item.createdAt).toLocaleString('zh-CN')}</div>
                         <div>操作人: ${item.operator}</div>
+                        ${approverInfo}
                         <div>版本号: <span class="tag" style="background: #e6f7ff; color: #1890ff;">${version}</span></div>
                         <div>原因: ${item.reason}</div>
                         ${item.gitlabMR ? `<div>GitLab MR: <a href="${item.gitlabMR}" target="_blank">${item.gitlabMR}</a></div>` : ''}
                         ${compareBtn}
+                        ${rollbackBtn}
                     </div>
                 `;
             }).join('');
@@ -1125,6 +1140,36 @@
 
         function hideStatsModal() {
             document.getElementById('statsModal').classList.remove('active');
+        }
+
+        async function rollbackToVersion(configId, historyId) {
+            const operator = prompt('请输入操作人:');
+            if (!operator) return;
+            
+            const reason = prompt('请输入回滚原因:');
+            if (!reason) return;
+            
+            if (!confirm('确定要回滚到此版本吗？')) return;
+            
+            try {
+                const response = await fetch(`/api/v1/configs/${configId}/rollback`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ historyId, operator, reason })
+                });
+                
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('回滚成功');
+                    hideHistoryModal();
+                    await loadConfigs();
+                } else {
+                    alert('回滚失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('回滚失败:', error);
+                alert('回滚失败');
+            }
         }
 
         init();

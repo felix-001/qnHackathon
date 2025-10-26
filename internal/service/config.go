@@ -114,6 +114,7 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 		ChangeType:  "create",
 		Reason:      reason,
 		Operator:    operator,
+		Approver:    config.Approver,
 		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
@@ -154,6 +155,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 			"content":     config.Content,
 			"description": config.Description,
 			"version":     config.Version,
+			"approver":    config.Approver,
 			"updatedAt":   config.UpdatedAt,
 		},
 	}
@@ -174,6 +176,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 		ChangeType:  "update",
 		Reason:      reason,
 		Operator:    operator,
+		Approver:    config.Approver,
 		Version:     config.Version,
 		CreatedAt:   time.Now(),
 	}
@@ -379,5 +382,73 @@ func incrementVersion(currentVersion string) string {
 	}
 
 	return fmt.Sprintf("v%s.%s.%d", parts[0], parts[1], patch+1)
+}
+
+func (s *ConfigService) Rollback(configID, historyID, operator, reason string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	objConfigID, err := primitive.ObjectIDFromHex(configID)
+	if err != nil {
+		return err
+	}
+
+	objHistoryID, err := primitive.ObjectIDFromHex(historyID)
+	if err != nil {
+		return err
+	}
+
+	var history model.ConfigHistory
+	err = s.db.Database.Collection("config_history").FindOne(ctx, bson.M{"_id": objHistoryID}).Decode(&history)
+	if err != nil {
+		return err
+	}
+
+	currentConfig, err := s.Get(configID)
+	if err != nil {
+		return err
+	}
+
+	maxVersion, err := s.getMaxVersion(currentConfig.ProjectID, currentConfig.Environment)
+	if err != nil && err.Error() != "mongo: no documents in result" {
+		return err
+	}
+	newVersion := incrementVersion(maxVersion)
+
+	rollbackContent := history.NewContent
+	if rollbackContent == "" {
+		rollbackContent = history.OldContent
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"content":   rollbackContent,
+			"version":   newVersion,
+			"updatedAt": time.Now(),
+		},
+	}
+
+	_, err = s.db.Database.Collection("configs").UpdateOne(ctx, bson.M{"_id": objConfigID}, update)
+	if err != nil {
+		return err
+	}
+
+	rollbackHistory := &model.ConfigHistory{
+		ConfigID:    configID,
+		ProjectID:   currentConfig.ProjectID,
+		ProjectName: currentConfig.ProjectName,
+		Environment: currentConfig.Environment,
+		FileName:    currentConfig.FileName,
+		OldContent:  currentConfig.Content,
+		NewContent:  rollbackContent,
+		ChangeType:  "rollback",
+		Reason:      reason,
+		Operator:    operator,
+		Version:     newVersion,
+		CreatedAt:   time.Now(),
+	}
+
+	_, err = s.db.Database.Collection("config_history").InsertOne(ctx, rollbackHistory)
+	return err
 }
 

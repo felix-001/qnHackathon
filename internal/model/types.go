@@ -104,6 +104,7 @@ type Config struct {
 	Content     string    `json:"content" bson:"content"`
 	Description string    `json:"description" bson:"description"`
 	Version     string    `json:"version" bson:"version"`
+	Approver    string    `json:"approver" bson:"approver"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
 }
@@ -120,6 +121,7 @@ type ConfigHistory struct {
 	ChangeType  string    `json:"changeType" bson:"changeType"`
 	Reason      string    `json:"reason" bson:"reason"`
 	Operator    string    `json:"operator" bson:"operator"`
+	Approver    string    `json:"approver" bson:"approver"`
 	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
 	Version     string    `json:"version" bson:"version"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
