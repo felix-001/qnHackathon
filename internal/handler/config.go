@@ -234,3 +234,145 @@ func (h *ConfigHandler) Compare(c *gin.Context) {
 		Data:    result,
 	})
 }
+
+func (h *ConfigHandler) GetVersionStats(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	if projectID == "" || environment == "" {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: "projectId and environment are required",
+		})
+		return
+	}
+
+	stats, err := h.configService.GetVersionStats(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    stats,
+	})
+}
+
+func (h *ConfigHandler) GetVersionInconsistencies(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	if projectID == "" || environment == "" {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: "projectId and environment are required",
+		})
+		return
+	}
+
+	inconsistencies, err := h.configService.GetVersionInconsistencies(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    inconsistencies,
+	})
+}
+
+type CreateCanaryReleaseRequest struct {
+	ConfigID    string `json:"configId" binding:"required"`
+	ProjectID   string `json:"projectId" binding:"required"`
+	Environment string `json:"environment" binding:"required"`
+	Version     string `json:"version" binding:"required"`
+	Strategy    string `json:"strategy" binding:"required"`
+	TargetGroup string `json:"targetGroup" binding:"required"`
+	TargetValue string `json:"targetValue" binding:"required"`
+	Operator    string `json:"operator" binding:"required"`
+}
+
+func (h *ConfigHandler) CreateCanaryRelease(c *gin.Context) {
+	var req CreateCanaryReleaseRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	canary := &model.CanaryRelease{
+		ConfigID:    req.ConfigID,
+		ProjectID:   req.ProjectID,
+		Environment: req.Environment,
+		Version:     req.Version,
+		Strategy:    req.Strategy,
+		TargetGroup: req.TargetGroup,
+		TargetValue: req.TargetValue,
+		Operator:    req.Operator,
+	}
+
+	err := h.configService.CreateCanaryRelease(canary)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    canary,
+	})
+}
+
+func (h *ConfigHandler) ExecuteCanaryRelease(c *gin.Context) {
+	canaryID := c.Param("id")
+
+	err := h.configService.ExecuteCanaryRelease(canaryID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "canary release executed successfully",
+	})
+}
+
+func (h *ConfigHandler) ListCanaryReleases(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	releases, err := h.configService.ListCanaryReleases(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    releases,
+	})
+}

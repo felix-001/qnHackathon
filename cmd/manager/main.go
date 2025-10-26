@@ -92,6 +92,11 @@ func main() {
 		api.GET("/configs/:id/history", configHandler.GetHistory)
 		api.GET("/configs/history", configHandler.GetHistoryByProject)
 		api.GET("/configs/compare", configHandler.Compare)
+		api.GET("/configs/version-stats", configHandler.GetVersionStats)
+		api.GET("/configs/version-inconsistencies", configHandler.GetVersionInconsistencies)
+		api.POST("/configs/canary-releases", configHandler.CreateCanaryRelease)
+		api.POST("/configs/canary-releases/:id/execute", configHandler.ExecuteCanaryRelease)
+		api.GET("/configs/canary-releases", configHandler.ListCanaryReleases)
 
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)

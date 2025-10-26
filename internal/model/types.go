@@ -103,6 +103,7 @@ type Config struct {
 	FileName    string    `json:"fileName" bson:"fileName"`
 	Content     string    `json:"content" bson:"content"`
 	Description string    `json:"description" bson:"description"`
+	Version     string    `json:"version" bson:"version"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
 }
@@ -121,4 +122,53 @@ type ConfigHistory struct {
 	Operator    string    `json:"operator" bson:"operator"`
 	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+}
+
+type DeviceNode struct {
+	ID         string    `json:"id" bson:"_id,omitempty"`
+	NodeID     string    `json:"nodeId" bson:"nodeId"`
+	NodeName   string    `json:"nodeName" bson:"nodeName"`
+	Operator   string    `json:"operator" bson:"operator"`
+	Region     string    `json:"region" bson:"region"`
+	Province   string    `json:"province" bson:"province"`
+	DataCenter string    `json:"dataCenter" bson:"dataCenter"`
+	CreatedAt  time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt  time.Time `json:"updatedAt" bson:"updatedAt"`
+}
+
+type ConfigDeployment struct {
+	ID          string    `json:"id" bson:"_id,omitempty"`
+	ConfigID    string    `json:"configId" bson:"configId"`
+	ProjectID   string    `json:"projectId" bson:"projectId"`
+	Environment string    `json:"environment" bson:"environment"`
+	Version     string    `json:"version" bson:"version"`
+	NodeID      string    `json:"nodeId" bson:"nodeId"`
+	Status      string    `json:"status" bson:"status"`
+	DeployedAt  time.Time `json:"deployedAt" bson:"deployedAt"`
+}
+
+type CanaryRelease struct {
+	ID          string    `json:"id" bson:"_id,omitempty"`
+	ConfigID    string    `json:"configId" bson:"configId"`
+	ProjectID   string    `json:"projectId" bson:"projectId"`
+	Environment string    `json:"environment" bson:"environment"`
+	Version     string    `json:"version" bson:"version"`
+	Strategy    string    `json:"strategy" bson:"strategy"`
+	TargetGroup string    `json:"targetGroup" bson:"targetGroup"`
+	TargetValue string    `json:"targetValue" bson:"targetValue"`
+	Status      string    `json:"status" bson:"status"`
+	Operator    string    `json:"operator" bson:"operator"`
+	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+	CompletedAt *time.Time `json:"completedAt,omitempty" bson:"completedAt,omitempty"`
+}
+
+type ConfigVersionStats struct {
+	Version     string `json:"version"`
+	DeviceCount int    `json:"deviceCount"`
+}
+
+type VersionInconsistency struct {
+	MajorVersion string   `json:"majorVersion"`
+	DeviceCount  int      `json:"deviceCount"`
+	NodeIDs      []string `json:"nodeIds"`
 }
