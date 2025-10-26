@@ -15,10 +15,17 @@
         .menu-item:hover { background: #e6f7ff; }
         .menu-item.active { background: #1890ff; color: white; }
         .content { flex: 1; padding: 24px; background: #fff; margin: 24px; }
-        .charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-top: 24px; }
+        .filter-section { display: flex; gap: 16px; margin-bottom: 24px; align-items: flex-start; }
+        .filter-group { display: flex; flex-direction: column; gap: 8px; }
+        .filter-group label { font-weight: 600; color: #333; font-size: 14px; }
+        select { padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; min-width: 200px; }
+        .version-checkboxes { display: flex; flex-direction: column; gap: 8px; max-height: 200px; overflow-y: auto; border: 1px solid #d9d9d9; border-radius: 4px; padding: 12px; background: #fafafa; }
+        .version-checkbox { display: flex; align-items: center; gap: 8px; }
+        .version-checkbox input[type="checkbox"] { cursor: pointer; }
+        .version-checkbox label { cursor: pointer; margin: 0; }
+        .charts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
         .chart-card { padding: 24px; background: #fafafa; border-radius: 8px; }
         .chart-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 16px; }
-        select { padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; margin-bottom: 16px; }
     </style>
 </head>
 <body>
@@ -31,11 +38,20 @@
             <a href="/config" class="menu-item">配置管理</a>
         </div>
         <div class="content">
-            <select id="releaseSelect" onchange="loadCharts()">
-                <option value="">选择发布任务</option>
-                <option value="release-1">Release v1.0.0</option>
-                <option value="release-2">Release v1.1.0</option>
-            </select>
+            <div class="filter-section">
+                <div class="filter-group">
+                    <label>选择项目:</label>
+                    <select id="projectSelect" onchange="loadReleases()">
+                        <option value="">全部项目</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>选择版本 (可多选):</label>
+                    <div class="version-checkboxes" id="versionCheckboxes">
+                        <div style="color: #999; text-align: center;">请先选择项目</div>
+                    </div>
+                </div>
+            </div>
 
             <div class="charts">
                 <div class="chart-card">
@@ -60,28 +76,26 @@
 
     <script>
         let charts = {};
+        let projects = [];
+        let releases = [];
+        let selectedReleases = [];
+        const colors = ['#1890ff', '#52c41a', '#faad14', '#f5222d', '#722ed1', '#13c2c2', '#eb2f96', '#fa8c16'];
 
-        function createChart(canvasId, label, color) {
+        function createChart(canvasId, label) {
             const ctx = document.getElementById(canvasId).getContext('2d');
             return new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: [],
-                    datasets: [{
-                        label: label,
-                        data: [],
-                        borderColor: color,
-                        backgroundColor: color + '20',
-                        tension: 0.4,
-                        fill: true
-                    }]
+                    datasets: []
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: true,
                     plugins: {
                         legend: {
-                            display: false
+                            display: true,
+                            position: 'top'
                         }
                     },
                     scales: {
@@ -102,47 +116,167 @@
         }
 
         function initCharts() {
-            charts.requestRate = createChart('requestRateChart', '请求速率', '#1890ff');
-            charts.errorRate = createChart('errorRateChart', '错误率', '#f5222d');
-            charts.latencyP50 = createChart('latencyP50Chart', 'P50延迟', '#52c41a');
-            charts.latencyP99 = createChart('latencyP99Chart', 'P99延迟', '#faad14');
+            charts.requestRate = createChart('requestRateChart', '请求速率');
+            charts.errorRate = createChart('errorRateChart', '错误率');
+            charts.latencyP50 = createChart('latencyP50Chart', 'P50延迟');
+            charts.latencyP99 = createChart('latencyP99Chart', 'P99延迟');
         }
 
-        function updateChart(chart, dataPoints) {
-            const labels = dataPoints.map(dp => {
+        async function loadProjects() {
+            try {
+                const res = await fetch('/api/v1/projects');
+                const data = await res.json();
+                if (data.code === 0) {
+                    projects = data.data || [];
+                    const select = document.getElementById('projectSelect');
+                    projects.forEach(project => {
+                        const option = document.createElement('option');
+                        option.value = project.id;
+                        option.textContent = project.name;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('加载项目失败:', error);
+            }
+        }
+
+        async function loadReleases() {
+            const projectId = document.getElementById('projectSelect').value;
+            try {
+                const res = await fetch('/api/v1/releases');
+                const data = await res.json();
+                if (data.code === 0) {
+                    releases = data.data || [];
+                    if (projectId) {
+                        releases = releases.filter(r => r.projectId === projectId);
+                    }
+                    renderVersionCheckboxes();
+                }
+            } catch (error) {
+                console.error('加载发布任务失败:', error);
+            }
+        }
+
+        function renderVersionCheckboxes() {
+            const container = document.getElementById('versionCheckboxes');
+            container.innerHTML = '';
+            
+            if (releases.length === 0) {
+                container.innerHTML = '<div style="color: #999; text-align: center;">暂无发布任务</div>';
+                return;
+            }
+
+            releases.forEach(release => {
+                const div = document.createElement('div');
+                div.className = 'version-checkbox';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = 'release-' + release.id;
+                checkbox.value = release.id;
+                checkbox.onchange = handleVersionChange;
+                
+                const label = document.createElement('label');
+                label.htmlFor = 'release-' + release.id;
+                label.textContent = `${release.projectName} - ${release.version} (${release.environment})`;
+                
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
+            });
+        }
+
+        function handleVersionChange() {
+            const checkboxes = document.querySelectorAll('.version-checkbox input[type="checkbox"]:checked');
+            selectedReleases = Array.from(checkboxes).map(cb => cb.value);
+            loadCharts();
+        }
+
+        function updateChart(chart, allDataPoints, metricName) {
+            if (selectedReleases.length === 0) {
+                chart.data.labels = [];
+                chart.data.datasets = [];
+                chart.update();
+                return;
+            }
+
+            const firstRelease = allDataPoints[selectedReleases[0]];
+            if (!firstRelease) return;
+
+            const labels = firstRelease.map(dp => {
                 const date = new Date(dp.timestamp * 1000);
                 return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             });
-            const values = dataPoints.map(dp => dp.value);
+
+            const datasets = selectedReleases.map((releaseId, index) => {
+                const release = releases.find(r => r.id === releaseId);
+                const dataPoints = allDataPoints[releaseId] || [];
+                const values = dataPoints.map(dp => {
+                    if (metricName === 'errorRate') {
+                        return (dp.value * 100).toFixed(3);
+                    }
+                    return dp.value;
+                });
+
+                return {
+                    label: release ? `${release.version} (${release.environment})` : releaseId,
+                    data: values,
+                    borderColor: colors[index % colors.length],
+                    backgroundColor: colors[index % colors.length] + '20',
+                    tension: 0.4,
+                    fill: false
+                };
+            });
 
             chart.data.labels = labels;
-            chart.data.datasets[0].data = values;
+            chart.data.datasets = datasets;
             chart.update();
         }
 
-        function loadCharts() {
-            const releaseId = document.getElementById('releaseSelect').value;
-            if (!releaseId) return;
+        async function loadCharts() {
+            if (selectedReleases.length === 0) {
+                updateChart(charts.requestRate, {}, 'requestRate');
+                updateChart(charts.errorRate, {}, 'errorRate');
+                updateChart(charts.latencyP50, {}, 'latencyP50');
+                updateChart(charts.latencyP99, {}, 'latencyP99');
+                return;
+            }
 
-            fetch(`/api/v1/monitoring/timeseries?releaseId=${releaseId}`)
-                .then(res => res.json())
-                .then(data => {
-                    const timeSeries = data.data.timeSeries;
-                    updateChart(charts.requestRate, timeSeries.requestRate);
-                    updateChart(charts.errorRate, timeSeries.errorRate.map(dp => ({
-                        timestamp: dp.timestamp,
-                        value: (dp.value * 100).toFixed(3)
-                    })));
-                    updateChart(charts.latencyP50, timeSeries.latencyP50);
-                    updateChart(charts.latencyP99, timeSeries.latencyP99);
-                });
+            const allRequestRate = {};
+            const allErrorRate = {};
+            const allLatencyP50 = {};
+            const allLatencyP99 = {};
+
+            try {
+                for (const releaseId of selectedReleases) {
+                    const res = await fetch(`/api/v1/monitoring/timeseries?releaseId=${releaseId}`);
+                    const data = await res.json();
+                    if (data.code === 0) {
+                        const timeSeries = data.data.timeSeries;
+                        allRequestRate[releaseId] = timeSeries.requestRate;
+                        allErrorRate[releaseId] = timeSeries.errorRate;
+                        allLatencyP50[releaseId] = timeSeries.latencyP50;
+                        allLatencyP99[releaseId] = timeSeries.latencyP99;
+                    }
+                }
+
+                updateChart(charts.requestRate, allRequestRate, 'requestRate');
+                updateChart(charts.errorRate, allErrorRate, 'errorRate');
+                updateChart(charts.latencyP50, allLatencyP50, 'latencyP50');
+                updateChart(charts.latencyP99, allLatencyP99, 'latencyP99');
+            } catch (error) {
+                console.error('加载监控数据失败:', error);
+            }
         }
 
         initCharts();
+        loadProjects();
 
         setInterval(() => {
-            const releaseId = document.getElementById('releaseSelect').value;
-            if (releaseId) loadCharts();
+            if (selectedReleases.length > 0) {
+                loadCharts();
+            }
         }, 5000);
     </script>
 </body>
