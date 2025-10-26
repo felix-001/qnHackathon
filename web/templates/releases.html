@@ -135,10 +135,12 @@
                 return `<button class="btn" onclick="deployRelease('${release.id}')">发布</button>`;
             } else if (release.status === 'completed') {
                 return `
-                    <button class="btn btn-danger" onclick="rollback('${release.id}')" style="margin-right: 4px;">回滚</button>
-                    <button class="btn" onclick="fullRelease('${release.id}')" style="margin-right: 4px; background: #1890ff;">全量</button>
-                    <button class="btn btn-secondary" onclick="grayRelease('${release.id}')" style="margin-right: 4px; background: #ffa940;">灰度</button>
-                    <button class="btn" onclick="showMoreMenu('${release.id}', event)" style="background: #f0f0f0; color: #595959;">更多 ▼</button>
+                    <div class="action-buttons">
+                        <button class="btn-rollback" onclick="rollback('${release.id}')">回滚</button>
+                        <button class="btn-full-release" onclick="fullRelease('${release.id}')">全量</button>
+                        <button class="btn-gray-release" onclick="grayRelease('${release.id}')">灰度</button>
+                        <button class="btn-more" onclick="showMoreMenu('${release.id}', event)">更多</button>
+                    </div>
                 `;
             }
             return '';
@@ -362,23 +364,26 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
+                        releaseId: id,
                         projectId: release.projectId,
                         environment: release.environment,
                         version: release.version,
+                        strategy: release.strategy,
+                        description: '全量发布',
                         operator: 'admin'
                     })
                 })
                 .then(res => res.json())
                 .then(data => {
                     if (data.code === 200 || data.code === 0) {
-                        alert('全量发布成功');
+                        alert('✅ 全量发布成功');
                         loadReleases();
                     } else {
-                        alert('全量发布失败: ' + data.message);
+                        alert('❌ 全量发布失败: ' + (data.message || '未知错误'));
                     }
                 })
                 .catch(err => {
-                    alert('全量发布失败: ' + err.message);
+                    alert('❌ 全量发布失败: ' + err.message);
                 });
             }
         }
@@ -392,7 +397,7 @@
             
             const pct = parseInt(percentage);
             if (isNaN(pct) || pct < 1 || pct > 100) {
-                alert('请输入有效的百分比 (1-100)');
+                alert('❌ 请输入有效的百分比 (1-100)');
                 return;
             }
             
@@ -421,14 +426,14 @@
             .then(res => res.json())
             .then(data => {
                 if (data.code === 200 || data.code === 0) {
-                    alert(`灰度发布配置创建成功 (${pct}% 设备)`);
+                    alert(`✅ 灰度发布配置创建成功 (${pct}% 设备)`);
                     loadReleases();
                 } else {
-                    alert('灰度发布配置创建失败: ' + data.message);
+                    alert('❌ 灰度发布配置创建失败: ' + (data.message || '未知错误'));
                 }
             })
             .catch(err => {
-                alert('灰度发布配置创建失败: ' + err.message);
+                alert('❌ 灰度发布配置创建失败: ' + err.message);
             });
         }
 
@@ -445,45 +450,31 @@
             
             const menu = document.createElement('div');
             menu.id = 'moreMenu';
-            menu.style.cssText = `
-                position: fixed;
-                background: white;
-                border: 1px solid #d9d9d9;
-                border-radius: 4px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-                z-index: 1000;
-                min-width: 150px;
-            `;
+            menu.className = 'more-menu';
             
             const rect = event.target.getBoundingClientRect();
             menu.style.left = rect.left + 'px';
             menu.style.top = (rect.bottom + 5) + 'px';
             
             const menuItems = [
-                { label: '查看详情', action: () => alert('版本详情:\n' + JSON.stringify(release, null, 2)) },
-                { label: '复制版本', action: () => copyRelease(id) },
-                { label: '对比版本', action: () => alert('对比版本功能开发中...') },
-                { label: '查看部署日志', action: () => alert('部署日志:\n发布时间: ' + new Date(release.createdAt).toLocaleString()) },
-                { label: '编辑版本信息', action: () => editRelease(id) },
+                { icon: '📋', label: '查看详情', action: () => alert('版本详情:\n' + JSON.stringify(release, null, 2)) },
+                { icon: '📑', label: '复制版本', action: () => copyRelease(id) },
+                { icon: '🔍', label: '对比版本', action: () => alert('对比版本功能开发中...') },
+                { icon: '📝', label: '查看部署日志', action: () => alert('部署日志:\n发布时间: ' + new Date(release.createdAt).toLocaleString()) },
+                { icon: '✏️', label: '编辑版本信息', action: () => editRelease(id) },
                 { divider: true },
-                { label: '导出版本报告', action: () => exportRelease(id) }
+                { icon: '💾', label: '导出版本报告', action: () => exportRelease(id) }
             ];
             
             menuItems.forEach(item => {
                 if (item.divider) {
                     const divider = document.createElement('div');
-                    divider.style.cssText = 'height: 1px; background: #f0f0f0; margin: 4px 0;';
+                    divider.className = 'more-menu-divider';
                     menu.appendChild(divider);
                 } else {
                     const menuItem = document.createElement('div');
-                    menuItem.textContent = item.label;
-                    menuItem.style.cssText = `
-                        padding: 8px 16px;
-                        cursor: pointer;
-                        font-size: 14px;
-                    `;
-                    menuItem.onmouseover = () => menuItem.style.background = '#f5f5f5';
-                    menuItem.onmouseout = () => menuItem.style.background = 'white';
+                    menuItem.className = 'more-menu-item';
+                    menuItem.innerHTML = `<span>${item.icon}</span><span>${item.label}</span>`;
                     menuItem.onclick = () => {
                         item.action();
                         menu.remove();

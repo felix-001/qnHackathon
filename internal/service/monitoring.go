@@ -12,7 +12,15 @@ func NewMonitoringService() *MonitoringService {
 	return &MonitoringService{}
 }
 
-func (s *MonitoringService) GetRealtime(releaseID string) (*model.MonitoringMetrics, error) {
+func (s *MonitoringService) GetRealtime(releaseID, machineID string) (*model.MonitoringMetrics, error) {
+	seed := int64(0)
+	if machineID != "" {
+		for _, c := range machineID {
+			seed += int64(c)
+		}
+		rand.Seed(seed)
+	}
+
 	return &model.MonitoringMetrics{
 		RequestRate:      float64(rand.Intn(2000)),
 		ErrorRate:        rand.Float64() * 0.01,
@@ -30,9 +38,17 @@ func (s *MonitoringService) GetRealtime(releaseID string) (*model.MonitoringMetr
 	}, nil
 }
 
-func (s *MonitoringService) GetTimeSeries(releaseID string) (*model.MonitoringTimeSeries, error) {
+func (s *MonitoringService) GetTimeSeries(releaseID, machineID string) (*model.MonitoringTimeSeries, error) {
 	now := time.Now().Unix()
 	dataPoints := 30
+
+	seed := int64(0)
+	if machineID != "" {
+		for _, c := range machineID {
+			seed += int64(c)
+		}
+		rand.Seed(seed + now)
+	}
 
 	requestRate := make([]model.MetricDataPoint, dataPoints)
 	errorRate := make([]model.MetricDataPoint, dataPoints)
