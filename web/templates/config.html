@@ -48,6 +48,11 @@
         .compare-panel { border: 1px solid #d9d9d9; border-radius: 4px; padding: 12px; }
         .compare-panel h4 { margin-bottom: 8px; color: #1890ff; }
         .compare-content { background: #f5f5f5; padding: 8px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .diff-line { padding: 2px 4px; }
+        .diff-added { background: #d4edda; color: #155724; }
+        .diff-removed { background: #f8d7da; color: #721c24; }
+        .diff-changed { background: #fff3cd; color: #856404; }
+        .diff-unchanged { color: #666; }
         .empty-state { text-align: center; padding: 40px; color: #999; }
     </style>
 </head>
@@ -125,12 +130,6 @@
                 <div class="form-group">
                     <label>操作人 <span style="color: red;">*</span></label>
                     <input type="text" id="operator" required placeholder="输入操作人姓名">
-                </div>
-                <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="submitToGitLab" checked>
-                        <label for="submitToGitLab" style="margin-bottom: 0;">提交到GitLab</label>
-                    </div>
                 </div>
                 <div class="btn-group">
                     <button type="button" class="btn" style="background: #d9d9d9; color: #333;" onclick="hideModal()">取消</button>
@@ -297,7 +296,6 @@
             const description = document.getElementById('description').value;
             const operator = document.getElementById('operator').value;
             const reason = document.getElementById('reason').value;
-            const submitToGitLab = document.getElementById('submitToGitLab').checked;
 
             if (!projectId) {
                 alert('请选择项目');
@@ -324,8 +322,7 @@
             const requestData = {
                 config: config,
                 operator: operator,
-                reason: reason,
-                submitToGitLab: submitToGitLab
+                reason: reason
             };
             
             try {
@@ -346,7 +343,7 @@
                 
                 const data = await response.json();
                 if (data.code === 200) {
-                    alert('保存成功' + (data.data.mrURL ? '\nGitLab MR: ' + data.data.mrURL : ''));
+                    alert('保存成功');
                     hideModal();
                     await loadConfigs();
                 } else {
@@ -446,6 +443,48 @@
             }
         }
 
+        function getDiffLines(oldText, newText) {
+            const oldLines = oldText.split('\n');
+            const newLines = newText.split('\n');
+            const maxLen = Math.max(oldLines.length, newLines.length);
+            
+            const leftLines = [];
+            const rightLines = [];
+            
+            for (let i = 0; i < maxLen; i++) {
+                const oldLine = oldLines[i] || '';
+                const newLine = newLines[i] || '';
+                
+                if (oldLine === newLine) {
+                    leftLines.push({ type: 'unchanged', content: oldLine });
+                    rightLines.push({ type: 'unchanged', content: newLine });
+                } else {
+                    if (i < oldLines.length) {
+                        leftLines.push({ type: 'removed', content: oldLine });
+                    } else {
+                        leftLines.push({ type: 'unchanged', content: '' });
+                    }
+                    
+                    if (i < newLines.length) {
+                        rightLines.push({ type: 'added', content: newLine });
+                    } else {
+                        rightLines.push({ type: 'unchanged', content: '' });
+                    }
+                }
+            }
+            
+            return { leftLines, rightLines };
+        }
+        
+        function renderDiffLines(lines) {
+            return lines.map(line => {
+                const cssClass = line.type === 'unchanged' ? 'diff-unchanged' : 
+                                line.type === 'added' ? 'diff-added' : 'diff-removed';
+                const content = line.content || ' ';
+                return `<div class="diff-line ${cssClass}">${content}</div>`;
+            }).join('');
+        }
+        
         function renderCompare(compareData) {
             const container = document.getElementById('compareContent');
             const history1 = compareData.history1;
@@ -462,6 +501,8 @@
                 content2 = JSON.stringify(JSON.parse(content2), null, 2);
             } catch (e) {}
             
+            const { leftLines, rightLines } = getDiffLines(content2, content1);
+            
             container.innerHTML = `
                 <div class="compare-container">
                     <div class="compare-panel">
@@ -469,14 +510,14 @@
                         <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
                             ${new Date(history1.createdAt).toLocaleString('zh-CN')} - ${history1.operator}
                         </div>
-                        <div class="compare-content">${content1}</div>
+                        <div class="compare-content">${renderDiffLines(rightLines)}</div>
                     </div>
                     <div class="compare-panel">
                         <h4>旧版本</h4>
                         <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
                             ${new Date(history2.createdAt).toLocaleString('zh-CN')} - ${history2.operator}
                         </div>
-                        <div class="compare-content">${content2}</div>
+                        <div class="compare-content">${renderDiffLines(leftLines)}</div>
                     </div>
                 </div>
             `;
