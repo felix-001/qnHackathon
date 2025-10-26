@@ -4,9 +4,9 @@
   become: yes # 提权操作
   vars:
     # 可配置参数 - 根据实际需求修改
-    bin_name: "mybin1" # 组件|服务名称
+    bin_name: "streamd" # 组件|服务名称
     bin_tar: "{{ bin_name }}.tar.gz" # 软件包名称
-    bin_tar_url: "http://101.133.131.188:38019/files/mybin1.tar.gz" # 下载URL
+    bin_tar_url: "http://101.133.131.188:38010/job/streamd/lastSuccessfulBuild/artifact/streamd-20251026-040135.tar.gz" # 下载URL
     download_dir: "/tmp/download" # 下载保存目录
     bin_tar_dest: "{{ download_dir }}/{{ bin_tar }}" # 本地保存路径
     # 解压
