@@ -4,7 +4,7 @@
 
 ## 项目结构
 
-```
+```bash
 .
 ├── cmd/
 │   └── manager/           # 主程序入口
@@ -22,23 +22,27 @@
 ## 功能模块
 
 ### 1. 项目管理
+
 - 项目创建、编辑、删除
 - 项目列表查询
 - 支持多种构建工具和部署类型
 
 ### 2. 发布管理
+
 - 创建发布任务
 - 支持多种发布策略（蓝绿部署、金丝雀发布、滚动更新）
 - 发布状态监控
 - 一键回滚功能
 
 ### 3. 监控面板
+
 - 实时性能指标展示
 - 请求速率监控
 - 错误率统计
 - 延迟监控（P50/P95/P99）
 
 ### 4. 配置管理
+
 - 多环境配置管理
 - 配置增删改查
 
@@ -63,7 +67,7 @@ go mod download
 go run cmd/manager/main.go -f internal/config/manager.json
 ```
 
-服务将在 http://localhost:38012 启动
+服务将在 <http://localhost:38012> 启动
 
 ### API端点
 
@@ -126,19 +130,23 @@ go run cmd/manager/main.go -f internal/config/manager.json
 - [ ] 通知服务集成
 - [ ] 完善单元测试
 
-# jenkins地址
-- http://101.133.131.188:38010
+## jenkins地址
+
+- <http://101.133.131.188:38010>
 - 用户名:admin
 - 密码：e99c6614893247c2aa2b7b1b3f964517
 
-# gitlab地址
-- http://101.133.131.188:30811
+## gitlab地址
+
+- <http://101.133.131.188:30811>
 - 用户名: root
 - 密码: ofB4koHkZe6J5uqmrkBcH5tm/fpCPEcR1ol6YdQAUd0=
 
-# 项目演示地址
-http://101.133.131.188:38012/
+## 项目演示地址
 
-# 模拟业务服务地址
-- https://gitee.com/swayinwind/streamd.git
+<http://101.133.131.188:38012/>
+
+## 模拟业务服务地址
+
+- <https://gitee.com/swayinwind/streamd.git>
 - 服务启动后，会启动一个web服务，在web上展示服务的版本号

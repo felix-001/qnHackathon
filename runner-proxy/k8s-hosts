@@ -1,0 +1,37 @@
+[k8s]
+101.133.131.188
+
+# 连续 IP 可用通配符
+## 192.168.1.[103:105]  # 包含 103、104、105
+# 带变量（仅对当前主机生效）
+## web02.example.com ansible_user=admin ansible_port=2222
+
+# [databases]
+# 101.133.131.188
+
+# [appservers]
+# 101.133.131.188
+
+# ------------------------------
+# 4. 变量定义（组变量/全局变量）
+# ------------------------------
+# 组变量：对整个组生效
+# [webservers:vars]
+## ansible_user=www  # 该组主机默认登录用户
+## http_port=80
+## max_connections=1000
+
+# [databases:vars]
+## ansible_user=dbadmin
+## db_port=3306
+
+# 全局变量：对所有主机生效（谨慎使用）
+[all:vars]
+ansible_ssh_common_args="-o StrictHostKeyChecking=no"  # 禁用 SSH 主机密钥检查
+# ansible_python_interpreter=/usr/bin/python3  # 指定远程 Python 解释器路径
+
+# ------------------------------
+# 5. 动态主机清单（引用外部脚本/文件）
+# ------------------------------
+# 若需要动态生成主机列表（如从云平台获取），可指定可执行脚本路径
+# ./dynamic_inventory.py  # 脚本需返回 JSON 格式的主机信息
