@@ -348,6 +348,7 @@
                         <td>
                             <button class="btn action-btn" onclick="editConfig('${config.id}')">编辑</button>
                             <button class="btn action-btn" onclick="showHistory('${config.projectId}', '${config.environment}')">历史</button>
+                            <button class="btn action-btn" onclick="showGrayForConfig('${config.projectId}', '${config.projectName}', '${config.environment}')" style="background: #faad14;">灰度管理</button>
                             <button class="btn btn-danger action-btn" onclick="deleteConfig('${config.id}')">删除</button>
                         </td>
                     </tr>
@@ -1101,6 +1102,24 @@
 
         function hideStatsModal() {
             document.getElementById('statsModal').classList.remove('active');
+        }
+
+        function showGrayForConfig(projectId, projectName, environment) {
+            switchTab('gray');
+            
+            setTimeout(() => {
+                const grayProjectFilter = document.getElementById('grayProjectFilter');
+                const grayEnvFilter = document.getElementById('grayEnvFilter');
+                
+                if (grayProjectFilter) {
+                    grayProjectFilter.value = projectId;
+                }
+                if (grayEnvFilter) {
+                    grayEnvFilter.value = environment;
+                }
+                
+                loadGrayReleases();
+            }, 100);
         }
 
         async function rollbackToVersion(configId, historyId) {
