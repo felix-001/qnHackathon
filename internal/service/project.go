@@ -38,6 +38,20 @@ func (s *ProjectService) List() []model.Project {
 	return projects
 }
 
+func (s *ProjectService) Get(id string) (*model.Project, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var project model.Project
+	filter := bson.M{"_id": id}
+	err := s.collection.FindOne(ctx, filter).Decode(&project)
+	if err != nil {
+		return nil, err
+	}
+
+	return &project, nil
+}
+
 func (s *ProjectService) Create(project *model.Project) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

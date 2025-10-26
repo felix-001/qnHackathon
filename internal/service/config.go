@@ -266,3 +266,35 @@ func (s *ConfigService) SubmitToGitLab(config *model.Config, gitlabMgr *GitLabMg
 
 	return mrURL, nil
 }
+
+func (s *ConfigService) SubmitToGitHub(config *model.Config, githubMgr *GitHubMgr, operator string, reason string, projectName string) (string, error) {
+	configJSON, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return "", err
+	}
+
+	fileName := fmt.Sprintf("configs/%s/%s.json", projectName, config.Environment)
+	branchName := fmt.Sprintf("config-update-%s-%s-%d", projectName, config.Environment, time.Now().Unix())
+	commitMessage := fmt.Sprintf("Update config: %s/%s\n\nReason: %s\nOperator: %s", projectName, config.Environment, reason, operator)
+
+	err = githubMgr.CreateBranch("main", branchName)
+	if err != nil {
+		return "", err
+	}
+
+	err = githubMgr.CreateOrUpdateFile(fileName, string(configJSON), branchName, commitMessage)
+	if err != nil {
+		return "", err
+	}
+
+	prTitle := fmt.Sprintf("配置更新: %s/%s", projectName, config.Environment)
+	prDescription := fmt.Sprintf("**项目**: %s\n**环境**: %s\n**修改原因**: %s\n**操作人**: %s",
+		projectName, config.Environment, reason, operator)
+
+	prURL, err := githubMgr.CreatePullRequest(branchName, "main", prTitle, prDescription)
+	if err != nil {
+		return "", err
+	}
+
+	return prURL, nil
+}

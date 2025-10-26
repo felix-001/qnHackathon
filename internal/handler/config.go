@@ -9,18 +9,25 @@ import (
 )
 
 type ConfigHandler struct {
-	configService *service.ConfigService
-	gitlabMgr     *service.GitLabMgr
+	configService  *service.ConfigService
+	projectService *service.ProjectService
+	gitlabMgr      *service.GitLabMgr
+	githubMgr      *service.GitHubMgr
 }
 
-func NewConfigHandler(configService *service.ConfigService) *ConfigHandler {
+func NewConfigHandler(configService *service.ConfigService, projectService *service.ProjectService) *ConfigHandler {
 	return &ConfigHandler{
-		configService: configService,
+		configService:  configService,
+		projectService: projectService,
 	}
 }
 
 func (h *ConfigHandler) SetGitLabMgr(gitlabMgr *service.GitLabMgr) {
 	h.gitlabMgr = gitlabMgr
+}
+
+func (h *ConfigHandler) SetGitHubMgr(githubMgr *service.GitHubMgr) {
+	h.githubMgr = githubMgr
 }
 
 func (h *ConfigHandler) List(c *gin.Context) {
@@ -63,10 +70,11 @@ func (h *ConfigHandler) Get(c *gin.Context) {
 }
 
 type CreateConfigRequest struct {
-	Config   *model.Config `json:"config"`
-	Operator string        `json:"operator"`
-	Reason   string        `json:"reason"`
-	SubmitToGitLab bool    `json:"submitToGitLab"`
+	Config         *model.Config `json:"config"`
+	Operator       string        `json:"operator"`
+	Reason         string        `json:"reason"`
+	SubmitToGitLab bool          `json:"submitToGitLab"`
+	SubmitToGitHub bool          `json:"submitToGitHub"`
 }
 
 func (h *ConfigHandler) Create(c *gin.Context) {
@@ -89,7 +97,24 @@ func (h *ConfigHandler) Create(c *gin.Context) {
 	}
 
 	var mrURL string
-	if req.SubmitToGitLab && h.gitlabMgr != nil {
+	if req.SubmitToGitHub && h.githubMgr != nil {
+		project, err := h.projectService.Get(req.Config.ProjectID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{
+				Code:    500,
+				Message: "Failed to get project: " + err.Error(),
+			})
+			return
+		}
+		mrURL, err = h.configService.SubmitToGitHub(req.Config, h.githubMgr, req.Operator, req.Reason, project.Name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{
+				Code:    500,
+				Message: "Config created but GitHub submission failed: " + err.Error(),
+			})
+			return
+		}
+	} else if req.SubmitToGitLab && h.gitlabMgr != nil {
 		mrURL, err = h.configService.SubmitToGitLab(req.Config, h.gitlabMgr, req.Operator, req.Reason)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{
@@ -111,10 +136,11 @@ func (h *ConfigHandler) Create(c *gin.Context) {
 }
 
 type UpdateConfigRequest struct {
-	Config   *model.Config `json:"config"`
-	Operator string        `json:"operator"`
-	Reason   string        `json:"reason"`
-	SubmitToGitLab bool    `json:"submitToGitLab"`
+	Config         *model.Config `json:"config"`
+	Operator       string        `json:"operator"`
+	Reason         string        `json:"reason"`
+	SubmitToGitLab bool          `json:"submitToGitLab"`
+	SubmitToGitHub bool          `json:"submitToGitHub"`
 }
 
 func (h *ConfigHandler) Update(c *gin.Context) {
@@ -139,7 +165,24 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 	}
 
 	var mrURL string
-	if req.SubmitToGitLab && h.gitlabMgr != nil {
+	if req.SubmitToGitHub && h.githubMgr != nil {
+		project, err := h.projectService.Get(req.Config.ProjectID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{
+				Code:    500,
+				Message: "Failed to get project: " + err.Error(),
+			})
+			return
+		}
+		mrURL, err = h.configService.SubmitToGitHub(req.Config, h.githubMgr, req.Operator, req.Reason, project.Name)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, model.Response{
+				Code:    500,
+				Message: "Config updated but GitHub submission failed: " + err.Error(),
+			})
+			return
+		}
+	} else if req.SubmitToGitLab && h.gitlabMgr != nil {
 		mrURL, err = h.configService.SubmitToGitLab(req.Config, h.gitlabMgr, req.Operator, req.Reason)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, model.Response{

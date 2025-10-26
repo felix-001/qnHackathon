@@ -54,10 +54,12 @@ func main() {
 	monitoringHandler := handler.NewMonitoringHandler(monitoringService)
 	binHandler := handler.NewBinHandler(binService)
 	gitlabMgr := service.NewGitLabMgr(cfg.GitlabConf)
+	githubMgr := service.NewGitHubMgr(cfg.GitHubConf)
 	binHandler.SetGitLabMgr(gitlabMgr)
 	binHandler.SetReleaseService(releaseService)
-	configHandler := handler.NewConfigHandler(configService)
+	configHandler := handler.NewConfigHandler(configService, projectService)
 	configHandler.SetGitLabMgr(gitlabMgr)
+	configHandler.SetGitHubMgr(githubMgr)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)

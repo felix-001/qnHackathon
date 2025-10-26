@@ -133,3 +133,93 @@ func (s *GitHubMgr) GetGitHubPullRequest() map[string]*GitMergeRequest {
 	}
 	return mrMap
 }
+
+func (s *GitHubMgr) CreateBranch(baseBranch, newBranch string) error {
+	ctx := context.Background()
+	
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
+	
+	ref, _, err := s.Client.Git.GetRef(ctx, s.Conf.Owner, s.Conf.Repo, "refs/heads/"+baseBranch)
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to get base branch: %v", err)
+		return err
+	}
+	
+	newRef := &github.Reference{
+		Ref: github.String("refs/heads/" + newBranch),
+		Object: &github.GitObject{
+			SHA: ref.Object.SHA,
+		},
+	}
+	
+	_, _, err = s.Client.Git.CreateRef(ctx, s.Conf.Owner, s.Conf.Repo, newRef)
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to create branch: %v", err)
+		return err
+	}
+	
+	log.Logger.Info().Msgf("Branch '%s' created successfully", newBranch)
+	return nil
+}
+
+func (s *GitHubMgr) CreateOrUpdateFile(filePath, content, branch, commitMessage string) error {
+	ctx := context.Background()
+	
+	fileContent, _, resp, err := s.Client.Repositories.GetContents(ctx, s.Conf.Owner, s.Conf.Repo, filePath, &github.RepositoryContentGetOptions{
+		Ref: branch,
+	})
+	
+	opts := &github.RepositoryContentFileOptions{
+		Message: github.String(commitMessage),
+		Content: []byte(content),
+		Branch:  github.String(branch),
+	}
+	
+	if err != nil && resp != nil && resp.StatusCode == 404 {
+		_, _, err = s.Client.Repositories.CreateFile(ctx, s.Conf.Owner, s.Conf.Repo, filePath, opts)
+		if err != nil {
+			log.Logger.Error().Msgf("Failed to create file: %v", err)
+			return err
+		}
+		log.Logger.Info().Msgf("File '%s' created successfully", filePath)
+	} else if err == nil {
+		opts.SHA = fileContent.SHA
+		_, _, err = s.Client.Repositories.UpdateFile(ctx, s.Conf.Owner, s.Conf.Repo, filePath, opts)
+		if err != nil {
+			log.Logger.Error().Msgf("Failed to update file: %v", err)
+			return err
+		}
+		log.Logger.Info().Msgf("File '%s' updated successfully", filePath)
+	} else {
+		log.Logger.Error().Msgf("Failed to get file: %v", err)
+		return err
+	}
+	
+	return nil
+}
+
+func (s *GitHubMgr) CreatePullRequest(sourceBranch, targetBranch, title, description string) (string, error) {
+	ctx := context.Background()
+	
+	if targetBranch == "" {
+		targetBranch = "main"
+	}
+	
+	newPR := &github.NewPullRequest{
+		Title: github.String(title),
+		Head:  github.String(sourceBranch),
+		Base:  github.String(targetBranch),
+		Body:  github.String(description),
+	}
+	
+	pr, _, err := s.Client.PullRequests.Create(ctx, s.Conf.Owner, s.Conf.Repo, newPR)
+	if err != nil {
+		log.Logger.Error().Msgf("Failed to create pull request: %v", err)
+		return "", err
+	}
+	
+	log.Logger.Info().Msgf("Pull request created: %s", pr.GetHTMLURL())
+	return pr.GetHTMLURL(), nil
+}
