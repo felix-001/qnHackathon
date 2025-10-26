@@ -2,10 +2,12 @@ package handler
 
 import (
 	"crypto/md5"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -104,7 +106,16 @@ func (h *BinHandler) GetBin(c *gin.Context) {
 	var streamdData struct {
 		Version string `json:"version"`
 	}
-	if err := json.Unmarshal([]byte(file.Content), &streamdData); err != nil {
+	log.Printf("streamd.json content: %s\n", file.Content)
+	// 先对 file.Content 进行 base64 解码
+	decoded, err := base64.StdEncoding.DecodeString(file.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to decode streamd.json content: %v", err)})
+		return
+	}
+
+	log.Printf("decoded streamd.json content: %s\n", decoded)
+	if err := json.Unmarshal(decoded, &streamdData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to parse streamd.json: %v", err)})
 		return
 	}
@@ -152,10 +163,10 @@ func (h *BinHandler) PostBin(c *gin.Context) {
 	h.binService.UpdateNodeBin(req.NodeID, binName, req.SHA256Sum)
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":    "binary version updated for node",
-		"node_id":    req.NodeID,
-		"bin_name":   binName,
-		"sha256sum":  req.SHA256Sum,
+		"message":   "binary version updated for node",
+		"node_id":   req.NodeID,
+		"bin_name":  binName,
+		"sha256sum": req.SHA256Sum,
 	})
 }
 

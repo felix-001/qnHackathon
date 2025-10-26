@@ -223,7 +223,7 @@ func (s *GitLabMgr) GetFile(branch, filename string) {
 
 func (s *GitLabMgr) UpdateVersion(filename, newVersion string) {
 	branch := s.CreateBranch("streamd")
-	updatedContent := fmt.Sprintf(`{"version": %s}`, newVersion)
+	updatedContent := fmt.Sprintf(`{"version": "%s"}`, newVersion)
 	// 提交更改
 	_, _, err := s.Client.RepositoryFiles.UpdateFile(s.Conf.ProjectID,
 		filename,
