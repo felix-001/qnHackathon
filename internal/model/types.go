@@ -100,6 +100,7 @@ type Config struct {
 	ProjectID   string    `json:"projectId" bson:"projectId"`
 	ProjectName string    `json:"projectName" bson:"projectName"`
 	Environment string    `json:"environment" bson:"environment"`
+	FileName    string    `json:"fileName" bson:"fileName"`
 	Content     string    `json:"content" bson:"content"`
 	Description string    `json:"description" bson:"description"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
@@ -112,6 +113,7 @@ type ConfigHistory struct {
 	ProjectID   string    `json:"projectId" bson:"projectId"`
 	ProjectName string    `json:"projectName" bson:"projectName"`
 	Environment string    `json:"environment" bson:"environment"`
+	FileName    string    `json:"fileName" bson:"fileName"`
 	OldContent  string    `json:"oldContent" bson:"oldContent"`
 	NewContent  string    `json:"newContent" bson:"newContent"`
 	ChangeType  string    `json:"changeType" bson:"changeType"`
