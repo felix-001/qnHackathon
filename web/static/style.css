@@ -427,6 +427,189 @@ input[type="checkbox"] {
     height: 16px;
 }
 
+.action-buttons {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.btn-rollback {
+    background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+    color: white;
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 4px rgba(255, 77, 79, 0.3);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-rollback:hover {
+    background: linear-gradient(135deg, #ff7875 0%, #ffa39e 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 77, 79, 0.4);
+}
+
+.btn-rollback:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(255, 77, 79, 0.3);
+}
+
+.btn-rollback::before {
+    content: '🔄';
+    font-size: 12px;
+}
+
+.btn-full-release {
+    background: linear-gradient(135deg, #1890ff 0%, #40a9ff 100%);
+    color: white;
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 4px rgba(24, 144, 255, 0.3);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-full-release:hover {
+    background: linear-gradient(135deg, #40a9ff 0%, #69c0ff 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(24, 144, 255, 0.4);
+}
+
+.btn-full-release:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(24, 144, 255, 0.3);
+}
+
+.btn-full-release::before {
+    content: '📤';
+    font-size: 12px;
+}
+
+.btn-gray-release {
+    background: linear-gradient(135deg, #ffa940 0%, #ffc069 100%);
+    color: white;
+    padding: 6px 14px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 4px rgba(255, 169, 64, 0.3);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-gray-release:hover {
+    background: linear-gradient(135deg, #ffc069 0%, #ffd591 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(255, 169, 64, 0.4);
+}
+
+.btn-gray-release:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(255, 169, 64, 0.3);
+}
+
+.btn-gray-release::before {
+    content: '🧪';
+    font-size: 12px;
+}
+
+.btn-more {
+    background: linear-gradient(135deg, #f0f0f0 0%, #fafafa 100%);
+    color: #595959;
+    padding: 6px 14px;
+    font-size: 13px;
+    border: 1px solid #d9d9d9;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-more:hover {
+    background: linear-gradient(135deg, #fafafa 0%, #ffffff 100%);
+    border-color: #40a9ff;
+    color: #262626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+}
+
+.btn-more:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.btn-more::before {
+    content: '⋯';
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.more-menu {
+    position: fixed;
+    background: white;
+    border: 1px solid #e8e8e8;
+    border-radius: 8px;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    z-index: 1000;
+    min-width: 180px;
+    overflow: hidden;
+    animation: menuSlideIn 0.2s ease;
+}
+
+@keyframes menuSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.more-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-primary);
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.more-menu-item:hover {
+    background: linear-gradient(90deg, #e6f7ff 0%, #f0f9ff 100%);
+    color: var(--primary-color);
+}
+
+.more-menu-divider {
+    height: 1px;
+    background: var(--border-color);
+    margin: 4px 0;
+}
+
 .tab-btn {
     padding: 12px 24px;
     background: none;
