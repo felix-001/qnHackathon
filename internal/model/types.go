@@ -61,6 +61,18 @@ type MonitoringMetrics struct {
 	LatencyP99  float64 `json:"latencyP99"`
 }
 
+type MetricDataPoint struct {
+	Timestamp int64   `json:"timestamp"`
+	Value     float64 `json:"value"`
+}
+
+type MonitoringTimeSeries struct {
+	RequestRate []MetricDataPoint `json:"requestRate"`
+	ErrorRate   []MetricDataPoint `json:"errorRate"`
+	LatencyP50  []MetricDataPoint `json:"latencyP50"`
+	LatencyP99  []MetricDataPoint `json:"latencyP99"`
+}
+
 type Response struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`

@@ -3,6 +3,7 @@ package service
 import (
 	"github.com/felix-001/qnHackathon/internal/model"
 	"math/rand"
+	"time"
 )
 
 type MonitoringService struct{}
@@ -18,5 +19,42 @@ func (s *MonitoringService) GetRealtime(releaseID string) (*model.MonitoringMetr
 		LatencyP50:  float64(rand.Intn(100)),
 		LatencyP95:  float64(rand.Intn(300)),
 		LatencyP99:  float64(rand.Intn(500)),
+	}, nil
+}
+
+func (s *MonitoringService) GetTimeSeries(releaseID string) (*model.MonitoringTimeSeries, error) {
+	now := time.Now().Unix()
+	dataPoints := 30
+
+	requestRate := make([]model.MetricDataPoint, dataPoints)
+	errorRate := make([]model.MetricDataPoint, dataPoints)
+	latencyP50 := make([]model.MetricDataPoint, dataPoints)
+	latencyP99 := make([]model.MetricDataPoint, dataPoints)
+
+	for i := 0; i < dataPoints; i++ {
+		timestamp := now - int64((dataPoints-i-1)*10)
+		requestRate[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     float64(1500 + rand.Intn(500)),
+		}
+		errorRate[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     rand.Float64() * 0.01,
+		}
+		latencyP50[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     float64(50 + rand.Intn(50)),
+		}
+		latencyP99[i] = model.MetricDataPoint{
+			Timestamp: timestamp,
+			Value:     float64(200 + rand.Intn(300)),
+		}
+	}
+
+	return &model.MonitoringTimeSeries{
+		RequestRate: requestRate,
+		ErrorRate:   errorRate,
+		LatencyP50:  latencyP50,
+		LatencyP99:  latencyP99,
 	}, nil
 }

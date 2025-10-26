@@ -35,3 +35,23 @@ func (h *MonitoringHandler) GetRealtime(c *gin.Context) {
 		},
 	})
 }
+
+func (h *MonitoringHandler) GetTimeSeries(c *gin.Context) {
+	releaseID := c.Query("releaseId")
+	timeSeries, err := h.service.GetTimeSeries(releaseID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    1,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    0,
+		Message: "success",
+		Data: map[string]interface{}{
+			"timeSeries": timeSeries,
+		},
+	})
+}
