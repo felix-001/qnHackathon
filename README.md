@@ -63,7 +63,7 @@ go mod download
 go run cmd/manager/main.go -f internal/config/manager.json
 ```
 
-服务将在 http://localhost:8080 启动
+服务将在 http://localhost:38012 启动
 
 ### API端点
 
