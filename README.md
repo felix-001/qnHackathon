@@ -130,17 +130,43 @@ go run cmd/manager/main.go -f internal/config/manager.json
 - [ ] 通知服务集成
 - [ ] 完善单元测试
 
-## jenkins地址
+## jenkins 地址
 
 - <http://101.133.131.188:38010>
 - 用户名:admin
 - 密码：e99c6614893247c2aa2b7b1b3f964517
 
-## gitlab地址
+## gitlab 地址
 
 - <http://101.133.131.188:30811>
 - 用户名: root
 - 密码: ofB4koHkZe6J5uqmrkBcH5tm/fpCPEcR1ol6YdQAUd0=
+
+## semaphore 地址
+
+semaphore 提供版本的具体的执行功能
+
+- 每个版本的部署都对应一个 semaphore 任务（资源对象）
+- 任务（以及任务的依赖）可以通过接口创建，触发，查询状态，查询结果: bin-proxy(runner-proxy) 从 manager 获取版本任务，将任务同步为 semaphore 的任务，并执行。manager 也能直接扩展操作 semaphore 的任务。
+- 任务的依赖从 github 拉取：比如任务的执行列表，元数据，脚本等
+
+环境：
+
+- <http://101.133.131.188:38020>
+- 用户名: admin
+- 密码: qiniu1024
+
+```bash
+
+docker run -p 38020:3000 --name semaphore \
+ -e SEMAPHORE_DB_DIALECT=bolt \
+ -e SEMAPHORE_ADMIN=admin \ # 用户
+ -e SEMAPHORE_ADMIN_PASSWORD=qiniu1024 \ # 密码
+ -e SEMAPHORE_ADMIN_NAME=Admin \
+ -e SEMAPHORE_ADMIN_EMAIL=admin@localhost \
+ -d semaphoreui/semaphore:latest
+
+```
 
 ## 项目演示地址
 
