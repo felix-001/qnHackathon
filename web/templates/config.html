@@ -54,6 +54,9 @@
         .diff-changed { background: #fff3cd; color: #856404; }
         .diff-unchanged { color: #666; }
         .empty-state { text-align: center; padding: 40px; color: #999; }
+        .compare-toolbar { margin-bottom: 16px; padding: 12px; background: #f0f2f5; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
+        .compare-info { color: #666; font-size: 12px; }
+        .history-checkbox { margin-right: 8px; }
     </style>
 </head>
 <body>
@@ -142,6 +145,12 @@
     <div id="historyModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">配置变更历史</div>
+            <div class="compare-toolbar">
+                <div class="compare-info">
+                    <span id="selectedCount">已选择 0 个版本</span>
+                </div>
+                <button type="button" class="btn" id="compareBtn" onclick="compareSelected()" disabled style="opacity: 0.5;">对比选中版本</button>
+            </div>
             <div id="historyList"></div>
             <div class="btn-group">
                 <button type="button" class="btn" onclick="hideHistoryModal()">关闭</button>
@@ -164,6 +173,7 @@
         let configs = [];
         let currentConfigId = null;
         let historyData = [];
+        let selectedHistoryIds = [];
 
         async function init() {
             await loadProjects();
@@ -406,6 +416,9 @@
                 return;
             }
             
+            selectedHistoryIds = [];
+            updateCompareButton();
+            
             container.innerHTML = history.map((item, index) => {
                 const changeTypeText = item.changeType === 'create' ? '创建' : item.changeType === 'update' ? '更新' : '删除';
                 const changeTypeClass = item.changeType;
@@ -415,9 +428,14 @@
                     compareBtn = `<button class="btn action-btn" onclick="showCompare('${item.id}', '${history[index + 1].id}')">与上一版本对比</button>`;
                 }
                 
+                const checkboxDisabled = item.changeType === 'delete' ? 'disabled' : '';
+                
                 return `
                     <div class="history-item">
-                        <div><span class="change-type ${changeTypeClass}">${changeTypeText}</span></div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" class="history-checkbox" ${checkboxDisabled} value="${item.id}" onchange="toggleHistorySelection('${item.id}')">
+                            <span class="change-type ${changeTypeClass}">${changeTypeText}</span>
+                        </div>
                         <div class="time">${new Date(item.createdAt).toLocaleString('zh-CN')}</div>
                         <div>操作人: ${item.operator}</div>
                         <div>原因: ${item.reason}</div>
@@ -426,6 +444,43 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        function toggleHistorySelection(id) {
+            const index = selectedHistoryIds.indexOf(id);
+            if (index > -1) {
+                selectedHistoryIds.splice(index, 1);
+            } else {
+                if (selectedHistoryIds.length >= 2) {
+                    alert('最多只能选择2个版本进行对比');
+                    const checkbox = document.querySelector(`input[value="${id}"]`);
+                    if (checkbox) checkbox.checked = false;
+                    return;
+                }
+                selectedHistoryIds.push(id);
+            }
+            updateCompareButton();
+        }
+
+        function updateCompareButton() {
+            const selectedCount = selectedHistoryIds.length;
+            document.getElementById('selectedCount').textContent = `已选择 ${selectedCount} 个版本`;
+            const compareBtn = document.getElementById('compareBtn');
+            if (selectedCount === 2) {
+                compareBtn.disabled = false;
+                compareBtn.style.opacity = '1';
+            } else {
+                compareBtn.disabled = true;
+                compareBtn.style.opacity = '0.5';
+            }
+        }
+
+        function compareSelected() {
+            if (selectedHistoryIds.length !== 2) {
+                alert('请选择2个版本进行对比');
+                return;
+            }
+            showCompare(selectedHistoryIds[0], selectedHistoryIds[1]);
         }
 
         async function showCompare(id1, id2) {
