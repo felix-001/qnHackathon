@@ -262,3 +262,36 @@ func (h *ConfigHandler) GetVersions(c *gin.Context) {
 		Data:    versions,
 	})
 }
+
+type RollbackRequest struct {
+	HistoryID string `json:"historyId"`
+	Operator  string `json:"operator"`
+	Reason    string `json:"reason"`
+}
+
+func (h *ConfigHandler) Rollback(c *gin.Context) {
+	configID := c.Param("id")
+
+	var req RollbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err := h.configService.Rollback(configID, req.HistoryID, req.Operator, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+	})
+}

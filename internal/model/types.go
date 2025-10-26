@@ -1,6 +1,61 @@
 package model
 
-import "time"
+import (
+	"fmt"
+	"strconv"
+	"time"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/bsontype"
+)
+
+type FlexibleVersion string
+
+func (v *FlexibleVersion) UnmarshalBSONValue(t bsontype.Type, data []byte) error {
+	raw := bson.RawValue{Type: t, Value: data}
+	
+	switch t {
+	case bsontype.String:
+		var s string
+		if err := raw.Unmarshal(&s); err != nil {
+			return err
+		}
+		*v = FlexibleVersion(s)
+		return nil
+	case bsontype.Int32:
+		var i int32
+		if err := raw.Unmarshal(&i); err != nil {
+			return err
+		}
+		*v = FlexibleVersion(fmt.Sprintf("v1.0.%d", i))
+		return nil
+	case bsontype.Int64:
+		var i int64
+		if err := raw.Unmarshal(&i); err != nil {
+			return err
+		}
+		*v = FlexibleVersion(fmt.Sprintf("v1.0.%d", i))
+		return nil
+	default:
+		return fmt.Errorf("cannot decode %s into FlexibleVersion", t)
+	}
+}
+
+func (v FlexibleVersion) MarshalBSONValue() (bsontype.Type, []byte, error) {
+	return bson.MarshalValue(string(v))
+}
+
+func (v FlexibleVersion) String() string {
+	return string(v)
+}
+
+func (v FlexibleVersion) ToInt() (int, error) {
+	s := string(v)
+	if s == "" {
+		return 0, nil
+	}
+	return strconv.Atoi(s)
+}
 
 type Project struct {
 	ID             string    `json:"id" bson:"_id,omitempty"`
@@ -96,33 +151,35 @@ type Response struct {
 }
 
 type Config struct {
-	ID          string    `json:"id" bson:"_id,omitempty"`
-	ProjectID   string    `json:"projectId" bson:"projectId"`
-	ProjectName string    `json:"projectName" bson:"projectName"`
-	Environment string    `json:"environment" bson:"environment"`
-	FileName    string    `json:"fileName" bson:"fileName"`
-	Content     string    `json:"content" bson:"content"`
-	Description string    `json:"description" bson:"description"`
-	Version     string    `json:"version" bson:"version"`
-	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
+	ID          string          `json:"id" bson:"_id,omitempty"`
+	ProjectID   string          `json:"projectId" bson:"projectId"`
+	ProjectName string          `json:"projectName" bson:"projectName"`
+	Environment string          `json:"environment" bson:"environment"`
+	FileName    string          `json:"fileName" bson:"fileName"`
+	Content     string          `json:"content" bson:"content"`
+	Description string          `json:"description" bson:"description"`
+	Version     FlexibleVersion `json:"version" bson:"version"`
+	Approver    string          `json:"approver" bson:"approver"`
+	CreatedAt   time.Time       `json:"createdAt" bson:"createdAt"`
+	UpdatedAt   time.Time       `json:"updatedAt" bson:"updatedAt"`
 }
 
 type ConfigHistory struct {
-	ID          string    `json:"id" bson:"_id,omitempty"`
-	ConfigID    string    `json:"configId" bson:"configId"`
-	ProjectID   string    `json:"projectId" bson:"projectId"`
-	ProjectName string    `json:"projectName" bson:"projectName"`
-	Environment string    `json:"environment" bson:"environment"`
-	FileName    string    `json:"fileName" bson:"fileName"`
-	OldContent  string    `json:"oldContent" bson:"oldContent"`
-	NewContent  string    `json:"newContent" bson:"newContent"`
-	ChangeType  string    `json:"changeType" bson:"changeType"`
-	Reason      string    `json:"reason" bson:"reason"`
-	Operator    string    `json:"operator" bson:"operator"`
-	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
-	Version     string    `json:"version" bson:"version"`
-	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+	ID          string          `json:"id" bson:"_id,omitempty"`
+	ConfigID    string          `json:"configId" bson:"configId"`
+	ProjectID   string          `json:"projectId" bson:"projectId"`
+	ProjectName string          `json:"projectName" bson:"projectName"`
+	Environment string          `json:"environment" bson:"environment"`
+	FileName    string          `json:"fileName" bson:"fileName"`
+	OldContent  string          `json:"oldContent" bson:"oldContent"`
+	NewContent  string          `json:"newContent" bson:"newContent"`
+	ChangeType  string          `json:"changeType" bson:"changeType"`
+	Reason      string          `json:"reason" bson:"reason"`
+	Operator    string          `json:"operator" bson:"operator"`
+	Approver    string          `json:"approver" bson:"approver"`
+	GitLabMR    string          `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
+	Version     FlexibleVersion `json:"version" bson:"version"`
+	CreatedAt   time.Time       `json:"createdAt" bson:"createdAt"`
 }
 
 type GrayReleaseRule struct {
