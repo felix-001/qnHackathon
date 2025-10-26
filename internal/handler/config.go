@@ -66,7 +66,6 @@ type CreateConfigRequest struct {
 	Config   *model.Config `json:"config"`
 	Operator string        `json:"operator"`
 	Reason   string        `json:"reason"`
-	SubmitToGitLab bool    `json:"submitToGitLab"`
 }
 
 func (h *ConfigHandler) Create(c *gin.Context) {
@@ -88,25 +87,10 @@ func (h *ConfigHandler) Create(c *gin.Context) {
 		return
 	}
 
-	var mrURL string
-	if req.SubmitToGitLab && h.gitlabMgr != nil {
-		mrURL, err = h.configService.SubmitToGitLab(req.Config, h.gitlabMgr, req.Operator, req.Reason)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, model.Response{
-				Code:    500,
-				Message: "Config created but GitLab submission failed: " + err.Error(),
-			})
-			return
-		}
-	}
-
 	c.JSON(http.StatusOK, model.Response{
 		Code:    200,
 		Message: "success",
-		Data: map[string]interface{}{
-			"config": req.Config,
-			"mrURL":  mrURL,
-		},
+		Data:    req.Config,
 	})
 }
 
@@ -114,7 +98,6 @@ type UpdateConfigRequest struct {
 	Config   *model.Config `json:"config"`
 	Operator string        `json:"operator"`
 	Reason   string        `json:"reason"`
-	SubmitToGitLab bool    `json:"submitToGitLab"`
 }
 
 func (h *ConfigHandler) Update(c *gin.Context) {
@@ -138,25 +121,10 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 		return
 	}
 
-	var mrURL string
-	if req.SubmitToGitLab && h.gitlabMgr != nil {
-		mrURL, err = h.configService.SubmitToGitLab(req.Config, h.gitlabMgr, req.Operator, req.Reason)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, model.Response{
-				Code:    500,
-				Message: "Config updated but GitLab submission failed: " + err.Error(),
-			})
-			return
-		}
-	}
-
 	c.JSON(http.StatusOK, model.Response{
 		Code:    200,
 		Message: "success",
-		Data: map[string]interface{}{
-			"config": req.Config,
-			"mrURL":  mrURL,
-		},
+		Data:    req.Config,
 	})
 }
 
