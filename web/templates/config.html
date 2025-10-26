@@ -558,6 +558,7 @@
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <input type="checkbox" class="history-checkbox" ${checkboxDisabled} value="${item.id}" onchange="toggleHistorySelection('${item.id}')">
                             <span class="change-type ${changeTypeClass}">${changeTypeText}</span>
+                            ${item.version ? `<span class="tag" style="background: #e6f7ff; color: #1890ff;">v${item.version}</span>` : ''}
                         </div>
                         <div class="time">${new Date(item.createdAt).toLocaleString('zh-CN')}</div>
                         <div>操作人: ${item.operator}</div>

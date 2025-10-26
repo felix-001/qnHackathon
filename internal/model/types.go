@@ -115,6 +115,7 @@ type ConfigHistory struct {
 	ProjectName string    `json:"projectName" bson:"projectName"`
 	Environment string    `json:"environment" bson:"environment"`
 	FileName    string    `json:"fileName" bson:"fileName"`
+	Version     int       `json:"version" bson:"version"`
 	OldContent  string    `json:"oldContent" bson:"oldContent"`
 	NewContent  string    `json:"newContent" bson:"newContent"`
 	ChangeType  string    `json:"changeType" bson:"changeType"`
