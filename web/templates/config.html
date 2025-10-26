@@ -27,21 +27,28 @@
         .tag.gray { background: #f5f5f5; color: #8c8c8c; }
         .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
         .modal.active { display: flex; align-items: center; justify-content: center; }
-        .modal-content { background: white; padding: 24px; border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-content { background: white; padding: 24px; border-radius: 8px; max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto; }
         .modal-header { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
         .form-group { margin-bottom: 16px; }
         .form-group label { display: block; margin-bottom: 4px; font-weight: 500; }
         .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
-        .form-group textarea { min-height: 80px; resize: vertical; }
+        .form-group textarea { min-height: 200px; resize: vertical; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px; }
         .checkbox-group { display: flex; align-items: center; gap: 8px; }
         .checkbox-group input[type="checkbox"] { width: auto; }
-        .gray-config { background: #fafafa; padding: 12px; border-radius: 4px; margin-top: 8px; }
-        .gray-config-item { margin-bottom: 12px; }
         .btn-group { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-        .history-item { padding: 12px; border: 1px solid #f0f0f0; border-radius: 4px; margin-bottom: 8px; }
+        .history-item { padding: 12px; border: 1px solid #f0f0f0; border-radius: 4px; margin-bottom: 8px; background: #fafafa; }
         .history-item .time { color: #8c8c8c; font-size: 12px; }
-        .diff { background: #fffbe6; padding: 8px; border-left: 3px solid #faad14; margin: 8px 0; }
+        .history-item .change-type { font-weight: bold; color: #1890ff; }
+        .history-item .change-type.create { color: #52c41a; }
+        .history-item .change-type.delete { color: #ff4d4f; }
+        .diff { background: #fffbe6; padding: 8px; border-left: 3px solid #faad14; margin: 8px 0; font-family: monospace; font-size: 12px; }
         .action-btn { padding: 4px 8px; font-size: 12px; margin-right: 4px; }
+        .json-editor { background: #f5f5f5; padding: 12px; border: 1px solid #d9d9d9; border-radius: 4px; font-family: 'Monaco', 'Menlo', monospace; font-size: 13px; }
+        .compare-container { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        .compare-panel { border: 1px solid #d9d9d9; border-radius: 4px; padding: 12px; }
+        .compare-panel h4 { margin-bottom: 8px; color: #1890ff; }
+        .compare-content { background: #f5f5f5; padding: 8px; font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
     </style>
 </head>
 <body>
@@ -55,9 +62,9 @@
         </div>
         <div class="content">
             <div class="toolbar">
-                <button class="btn" onclick="showCreateModal()">添加配置</button>
+                <button class="btn" onclick="showCreateModal()">新建配置</button>
                 <select id="projectFilter" onchange="loadConfigs()">
-                    <option value="">全部项目</option>
+                    <option value="">选择项目</option>
                 </select>
                 <select id="envFilter" onchange="loadConfigs()">
                     <option value="">全部环境</option>
@@ -69,18 +76,17 @@
             <table id="configTable">
                 <thead>
                     <tr>
-                        <th>配置键</th>
-                        <th>配置值</th>
-                        <th>项目</th>
+                        <th>项目名称</th>
                         <th>环境</th>
-                        <th>灰度配置</th>
+                        <th>配置文件</th>
                         <th>描述</th>
+                        <th>最后更新</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="configList">
                     <tr>
-                        <td colspan="7" style="text-align: center; color: #999;">加载中...</td>
+                        <td colspan="6" style="text-align: center; color: #999;">加载中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -93,19 +99,11 @@
             <form id="configForm" onsubmit="return false;">
                 <input type="hidden" id="configId">
                 <div class="form-group">
-                    <label>项目</label>
-                    <select id="projectId" required></select>
+                    <label>项目 <span style="color: red;">*</span></label>
+                    <select id="projectId" required onchange="updateProjectName()"></select>
                 </div>
                 <div class="form-group">
-                    <label>配置键</label>
-                    <input type="text" id="configKey" required>
-                </div>
-                <div class="form-group">
-                    <label>配置值</label>
-                    <textarea id="configValue" required></textarea>
-                </div>
-                <div class="form-group">
-                    <label>环境</label>
+                    <label>环境 <span style="color: red;">*</span></label>
                     <select id="environment" required>
                         <option value="dev">开发环境</option>
                         <option value="test">测试环境</option>
@@ -113,54 +111,20 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label>配置内容 (JSON格式) <span style="color: red;">*</span></label>
+                    <textarea id="configContent" required placeholder='{"key": "value", "nested": {"key": "value"}}'></textarea>
+                </div>
+                <div class="form-group">
                     <label>描述</label>
-                    <input type="text" id="description">
+                    <input type="text" id="description" placeholder="简要说明配置用途">
                 </div>
                 <div class="form-group">
-                    <div class="checkbox-group">
-                        <input type="checkbox" id="enableGray" onchange="toggleGrayConfig()">
-                        <label for="enableGray" style="margin-bottom: 0;">启用灰度发布</label>
-                    </div>
-                    <div id="grayConfig" class="gray-config" style="display: none;">
-                        <div class="form-group">
-                            <label>灰度策略</label>
-                            <select id="grayStrategy" onchange="updateGrayFields()">
-                                <option value="operator">按运营商</option>
-                                <option value="region">按区域</option>
-                                <option value="province">按省份</option>
-                                <option value="datacenter">按机房</option>
-                                <option value="percentage">按比例</option>
-                            </select>
-                        </div>
-                        <div class="gray-config-item" id="operatorField">
-                            <label>运营商（逗号分隔）</label>
-                            <input type="text" id="operators" placeholder="例如: 移动,联通,电信">
-                        </div>
-                        <div class="gray-config-item" id="regionField" style="display:none;">
-                            <label>区域（逗号分隔）</label>
-                            <input type="text" id="regions" placeholder="例如: 华北,华东,华南">
-                        </div>
-                        <div class="gray-config-item" id="provinceField" style="display:none;">
-                            <label>省份（逗号分隔）</label>
-                            <input type="text" id="provinces" placeholder="例如: 北京,上海,广东">
-                        </div>
-                        <div class="gray-config-item" id="datacenterField" style="display:none;">
-                            <label>机房（逗号分隔）</label>
-                            <input type="text" id="datacenters" placeholder="例如: DC1,DC2,DC3">
-                        </div>
-                        <div class="gray-config-item" id="percentageField" style="display:none;">
-                            <label>灰度比例（0-100）</label>
-                            <input type="number" id="percentage" min="0" max="100" placeholder="0-100">
-                        </div>
-                    </div>
+                    <label>修改原因 <span style="color: red;">*</span></label>
+                    <input type="text" id="reason" required placeholder="说明修改原因">
                 </div>
                 <div class="form-group">
-                    <label>修改原因</label>
-                    <input type="text" id="reason" required>
-                </div>
-                <div class="form-group">
-                    <label>操作人</label>
-                    <input type="text" id="operator" required>
+                    <label>操作人 <span style="color: red;">*</span></label>
+                    <input type="text" id="operator" required placeholder="输入操作人姓名">
                 </div>
                 <div class="form-group">
                     <div class="checkbox-group">
@@ -186,10 +150,21 @@
         </div>
     </div>
 
+    <div id="compareModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">配置对比</div>
+            <div id="compareContent"></div>
+            <div class="btn-group">
+                <button type="button" class="btn" onclick="hideCompareModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let projects = [];
         let configs = [];
         let currentConfigId = null;
+        let historyData = [];
 
         async function init() {
             await loadProjects();
@@ -213,13 +188,21 @@
             const projectFilter = document.getElementById('projectFilter');
             const projectId = document.getElementById('projectId');
             
-            projectFilter.innerHTML = '<option value="">全部项目</option>';
+            projectFilter.innerHTML = '<option value="">选择项目</option>';
             projectId.innerHTML = '<option value="">选择项目</option>';
             
             projects.forEach(project => {
                 projectFilter.innerHTML += `<option value="${project.id}">${project.name}</option>`;
-                projectId.innerHTML += `<option value="${project.id}">${project.name}</option>`;
+                projectId.innerHTML += `<option value="${project.id}" data-name="${project.name}">${project.name}</option>`;
             });
+        }
+
+        function updateProjectName() {
+            const select = document.getElementById('projectId');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption && selectedOption.dataset.name) {
+                window.currentProjectName = selectedOption.dataset.name;
+            }
         }
 
         async function loadConfigs() {
@@ -239,37 +222,32 @@
                 }
             } catch (error) {
                 console.error('加载配置失败:', error);
-                document.getElementById('configList').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
+                document.getElementById('configList').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
             }
         }
 
         function renderConfigs() {
             const tbody = document.getElementById('configList');
             if (configs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #999;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无配置数据，点击"新建配置"开始创建</td></tr>';
                 return;
             }
             
             tbody.innerHTML = configs.map(config => {
-                const project = projects.find(p => p.id === config.projectId);
-                const projectName = project ? project.name : config.projectId;
-                
-                let grayInfo = '<span class="tag gray">未启用</span>';
-                if (config.grayConfig && config.grayConfig.enabled) {
-                    grayInfo = `<span class="tag">${getGrayStrategyName(config.grayConfig.strategy)}</span>`;
-                }
+                const updateTime = new Date(config.updatedAt).toLocaleString('zh-CN');
+                const envName = getEnvName(config.environment);
+                const fileName = `${config.projectName}.json`;
                 
                 return `
                     <tr>
-                        <td>${config.key}</td>
-                        <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${config.value}</td>
-                        <td>${projectName}</td>
-                        <td>${getEnvName(config.environment)}</td>
-                        <td>${grayInfo}</td>
+                        <td><strong>${config.projectName}</strong></td>
+                        <td><span class="tag">${envName}</span></td>
+                        <td><code>${fileName}</code></td>
                         <td>${config.description || '-'}</td>
+                        <td>${updateTime}</td>
                         <td>
                             <button class="btn action-btn" onclick="editConfig('${config.id}')">编辑</button>
-                            <button class="btn action-btn" onclick="showHistory('${config.id}')">历史</button>
+                            <button class="btn action-btn" onclick="showHistory('${config.projectId}', '${config.environment}')">历史</button>
                             <button class="btn btn-danger action-btn" onclick="deleteConfig('${config.id}')">删除</button>
                         </td>
                     </tr>
@@ -282,117 +260,72 @@
             return names[env] || env;
         }
 
-        function getGrayStrategyName(strategy) {
-            const names = {
-                operator: '运营商',
-                region: '区域',
-                province: '省份',
-                datacenter: '机房',
-                percentage: '比例'
-            };
-            return names[strategy] || strategy;
-        }
-
         function showCreateModal() {
             currentConfigId = null;
             document.getElementById('configForm').reset();
             document.getElementById('configId').value = '';
-            document.getElementById('enableGray').checked = false;
-            toggleGrayConfig();
+            document.getElementById('configContent').value = '{\n  "key": "value"\n}';
             document.getElementById('configModal').classList.add('active');
         }
 
-        function editConfig(id) {
+        async function editConfig(id) {
             const config = configs.find(c => c.id === id);
             if (!config) return;
             
             currentConfigId = id;
             document.getElementById('configId').value = id;
             document.getElementById('projectId').value = config.projectId;
-            document.getElementById('configKey').value = config.key;
-            document.getElementById('configValue').value = config.value;
+            window.currentProjectName = config.projectName;
+            
+            try {
+                const contentObj = JSON.parse(config.content);
+                document.getElementById('configContent').value = JSON.stringify(contentObj, null, 2);
+            } catch (e) {
+                document.getElementById('configContent').value = config.content;
+            }
+            
             document.getElementById('environment').value = config.environment;
             document.getElementById('description').value = config.description || '';
             
-            if (config.grayConfig && config.grayConfig.enabled) {
-                document.getElementById('enableGray').checked = true;
-                document.getElementById('grayStrategy').value = config.grayConfig.strategy;
-                updateGrayFields();
-                
-                if (config.grayConfig.operators) {
-                    document.getElementById('operators').value = config.grayConfig.operators.join(',');
-                }
-                if (config.grayConfig.regions) {
-                    document.getElementById('regions').value = config.grayConfig.regions.join(',');
-                }
-                if (config.grayConfig.provinces) {
-                    document.getElementById('provinces').value = config.grayConfig.provinces.join(',');
-                }
-                if (config.grayConfig.datacenters) {
-                    document.getElementById('datacenters').value = config.grayConfig.datacenters.join(',');
-                }
-                if (config.grayConfig.percentage) {
-                    document.getElementById('percentage').value = config.grayConfig.percentage;
-                }
-            } else {
-                document.getElementById('enableGray').checked = false;
-            }
-            
-            toggleGrayConfig();
             document.getElementById('configModal').classList.add('active');
         }
 
-        function toggleGrayConfig() {
-            const enabled = document.getElementById('enableGray').checked;
-            document.getElementById('grayConfig').style.display = enabled ? 'block' : 'none';
-            if (enabled) {
-                updateGrayFields();
-            }
-        }
-
-        function updateGrayFields() {
-            const strategy = document.getElementById('grayStrategy').value;
-            document.getElementById('operatorField').style.display = strategy === 'operator' ? 'block' : 'none';
-            document.getElementById('regionField').style.display = strategy === 'region' ? 'block' : 'none';
-            document.getElementById('provinceField').style.display = strategy === 'province' ? 'block' : 'none';
-            document.getElementById('datacenterField').style.display = strategy === 'datacenter' ? 'block' : 'none';
-            document.getElementById('percentageField').style.display = strategy === 'percentage' ? 'block' : 'none';
-        }
-
         async function saveConfig() {
-            const config = {
-                projectId: document.getElementById('projectId').value,
-                key: document.getElementById('configKey').value,
-                value: document.getElementById('configValue').value,
-                environment: document.getElementById('environment').value,
-                description: document.getElementById('description').value
-            };
-            
-            if (document.getElementById('enableGray').checked) {
-                const strategy = document.getElementById('grayStrategy').value;
-                config.grayConfig = {
-                    enabled: true,
-                    strategy: strategy
-                };
-                
-                if (strategy === 'operator') {
-                    config.grayConfig.operators = document.getElementById('operators').value.split(',').map(s => s.trim()).filter(s => s);
-                } else if (strategy === 'region') {
-                    config.grayConfig.regions = document.getElementById('regions').value.split(',').map(s => s.trim()).filter(s => s);
-                } else if (strategy === 'province') {
-                    config.grayConfig.provinces = document.getElementById('provinces').value.split(',').map(s => s.trim()).filter(s => s);
-                } else if (strategy === 'datacenter') {
-                    config.grayConfig.datacenters = document.getElementById('datacenters').value.split(',').map(s => s.trim()).filter(s => s);
-                } else if (strategy === 'percentage') {
-                    config.grayConfig.percentage = parseInt(document.getElementById('percentage').value);
-                }
+            const projectId = document.getElementById('projectId').value;
+            const environment = document.getElementById('environment').value;
+            const content = document.getElementById('configContent').value;
+            const description = document.getElementById('description').value;
+            const operator = document.getElementById('operator').value;
+            const reason = document.getElementById('reason').value;
+            const submitToGitLab = document.getElementById('submitToGitLab').checked;
+
+            if (!projectId) {
+                alert('请选择项目');
+                return;
             }
+
+            try {
+                JSON.parse(content);
+            } catch (e) {
+                alert('配置内容不是有效的JSON格式: ' + e.message);
+                return;
+            }
+
+            const projectName = window.currentProjectName || document.getElementById('projectId').options[document.getElementById('projectId').selectedIndex].dataset.name;
+
+            const config = {
+                projectId: projectId,
+                projectName: projectName,
+                environment: environment,
+                content: content,
+                description: description
+            };
             
             const requestData = {
                 config: config,
-                operator: document.getElementById('operator').value,
-                reason: document.getElementById('reason').value,
-                submitToGitLab: document.getElementById('submitToGitLab').checked
+                operator: operator,
+                reason: reason,
+                submitToGitLab: submitToGitLab
             };
             
             try {
@@ -421,7 +354,7 @@
                 }
             } catch (error) {
                 console.error('保存配置失败:', error);
-                alert('保存失败');
+                alert('保存失败: ' + error.message);
             }
         }
 
@@ -454,12 +387,13 @@
             }
         }
 
-        async function showHistory(configId) {
+        async function showHistory(projectId, environment) {
             try {
-                const response = await fetch(`/api/v1/configs/${configId}/history`);
+                const response = await fetch(`/api/v1/configs/history?projectId=${projectId}&environment=${environment}`);
                 const data = await response.json();
                 if (data.code === 200) {
-                    renderHistory(data.data || []);
+                    historyData = data.data || [];
+                    renderHistory(historyData);
                     document.getElementById('historyModal').classList.add('active');
                 }
             } catch (error) {
@@ -471,21 +405,81 @@
         function renderHistory(history) {
             const container = document.getElementById('historyList');
             if (history.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #999;">暂无历史记录</p>';
+                container.innerHTML = '<div class="empty-state">暂无历史记录</div>';
                 return;
             }
             
-            container.innerHTML = history.map(item => `
-                <div class="history-item">
-                    <div><strong>${item.changeType === 'create' ? '创建' : item.changeType === 'update' ? '更新' : '删除'}</strong></div>
-                    <div class="time">${new Date(item.createdAt).toLocaleString()}</div>
-                    <div>操作人: ${item.operator}</div>
-                    <div>原因: ${item.reason}</div>
-                    ${item.changeType !== 'create' ? `<div class="diff">旧值: ${item.oldValue}</div>` : ''}
-                    ${item.changeType !== 'delete' ? `<div class="diff">新值: ${item.newValue}</div>` : ''}
-                    ${item.gitlabMR ? `<div>GitLab MR: <a href="${item.gitlabMR}" target="_blank">${item.gitlabMR}</a></div>` : ''}
+            container.innerHTML = history.map((item, index) => {
+                const changeTypeText = item.changeType === 'create' ? '创建' : item.changeType === 'update' ? '更新' : '删除';
+                const changeTypeClass = item.changeType;
+                
+                let compareBtn = '';
+                if (index < history.length - 1 && item.changeType !== 'delete') {
+                    compareBtn = `<button class="btn action-btn" onclick="showCompare('${item.id}', '${history[index + 1].id}')">与上一版本对比</button>`;
+                }
+                
+                return `
+                    <div class="history-item">
+                        <div><span class="change-type ${changeTypeClass}">${changeTypeText}</span></div>
+                        <div class="time">${new Date(item.createdAt).toLocaleString('zh-CN')}</div>
+                        <div>操作人: ${item.operator}</div>
+                        <div>原因: ${item.reason}</div>
+                        ${item.gitlabMR ? `<div>GitLab MR: <a href="${item.gitlabMR}" target="_blank">${item.gitlabMR}</a></div>` : ''}
+                        ${compareBtn}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function showCompare(id1, id2) {
+            try {
+                const response = await fetch(`/api/v1/configs/compare?id1=${id1}&id2=${id2}`);
+                const data = await response.json();
+                if (data.code === 200) {
+                    renderCompare(data.data);
+                    hideHistoryModal();
+                    document.getElementById('compareModal').classList.add('active');
+                }
+            } catch (error) {
+                console.error('对比失败:', error);
+                alert('对比失败');
+            }
+        }
+
+        function renderCompare(compareData) {
+            const container = document.getElementById('compareContent');
+            const history1 = compareData.history1;
+            const history2 = compareData.history2;
+            
+            let content1 = history1.newContent || history1.oldContent;
+            let content2 = history2.newContent || history2.oldContent;
+            
+            try {
+                content1 = JSON.stringify(JSON.parse(content1), null, 2);
+            } catch (e) {}
+            
+            try {
+                content2 = JSON.stringify(JSON.parse(content2), null, 2);
+            } catch (e) {}
+            
+            container.innerHTML = `
+                <div class="compare-container">
+                    <div class="compare-panel">
+                        <h4>新版本</h4>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                            ${new Date(history1.createdAt).toLocaleString('zh-CN')} - ${history1.operator}
+                        </div>
+                        <div class="compare-content">${content1}</div>
+                    </div>
+                    <div class="compare-panel">
+                        <h4>旧版本</h4>
+                        <div style="font-size: 12px; color: #666; margin-bottom: 8px;">
+                            ${new Date(history2.createdAt).toLocaleString('zh-CN')} - ${history2.operator}
+                        </div>
+                        <div class="compare-content">${content2}</div>
+                    </div>
                 </div>
-            `).join('');
+            `;
         }
 
         function hideModal() {
@@ -494,6 +488,10 @@
 
         function hideHistoryModal() {
             document.getElementById('historyModal').classList.remove('active');
+        }
+
+        function hideCompareModal() {
+            document.getElementById('compareModal').classList.remove('active');
         }
 
         init();

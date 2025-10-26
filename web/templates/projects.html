@@ -131,20 +131,22 @@
             fetch('/api/v1/projects')
                 .then(res => res.json())
                 .then(data => {
-                    const tbody = document.getElementById('projectList');
-                    tbody.innerHTML = data.data.map(p => `
-                        <tr onclick="showProjectDetail('${p.id}')">
-                            <td>${p.name}</td>
-                            <td>${p.code}</td>
-                            <td>${p.owner}</td>
-                            <td>${p.buildTool}</td>
-                            <td>${p.deploymentType}</td>
-                            <td>${p.status}</td>
-                            <td>
-                                <button onclick="event.stopPropagation(); deleteProject('${p.id}')">删除</button>
-                            </td>
-                        </tr>
-                    `).join('');
+                    if (data.code === 200 && data.data) {
+                        const tbody = document.getElementById('projectList');
+                        tbody.innerHTML = data.data.map(p => `
+                            <tr onclick="showProjectDetail('${p.id}')">
+                                <td>${p.name}</td>
+                                <td>${p.code}</td>
+                                <td>${p.owner}</td>
+                                <td>${p.buildTool}</td>
+                                <td>${p.deploymentType}</td>
+                                <td>${p.status}</td>
+                                <td>
+                                    <button onclick="event.stopPropagation(); deleteProject('${p.id}')">删除</button>
+                                </td>
+                            </tr>
+                        `).join('');
+                    }
                 });
         }
 

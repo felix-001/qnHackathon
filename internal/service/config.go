@@ -65,6 +65,22 @@ func (s *ConfigService) Get(id string) (*model.Config, error) {
 	return &config, nil
 }
 
+func (s *ConfigService) GetByProjectAndEnv(projectID, environment string) (*model.Config, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var config model.Config
+	err := s.db.Database.Collection("configs").FindOne(ctx, bson.M{
+		"projectId":   projectID,
+		"environment": environment,
+	}).Decode(&config)
+	if err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
 func (s *ConfigService) Create(config *model.Config, operator string, reason string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -80,15 +96,16 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 	config.ID = result.InsertedID.(primitive.ObjectID).Hex()
 
 	history := &model.ConfigHistory{
-		ConfigID:   config.ID,
-		ProjectID:  config.ProjectID,
-		Key:        config.Key,
-		OldValue:   "",
-		NewValue:   config.Value,
-		ChangeType: "create",
-		Reason:     reason,
-		Operator:   operator,
-		CreatedAt:  time.Now(),
+		ConfigID:    config.ID,
+		ProjectID:   config.ProjectID,
+		ProjectName: config.ProjectName,
+		Environment: config.Environment,
+		OldContent:  "",
+		NewContent:  config.Content,
+		ChangeType:  "create",
+		Reason:      reason,
+		Operator:    operator,
+		CreatedAt:   time.Now(),
 	}
 
 	_, err = s.db.Database.Collection("config_history").InsertOne(ctx, history)
@@ -114,11 +131,11 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 
 	update := bson.M{
 		"$set": bson.M{
-			"key":         config.Key,
-			"value":       config.Value,
+			"projectId":   config.ProjectID,
+			"projectName": config.ProjectName,
 			"environment": config.Environment,
+			"content":     config.Content,
 			"description": config.Description,
-			"grayConfig":  config.GrayConfig,
 			"updatedAt":   config.UpdatedAt,
 		},
 	}
@@ -129,15 +146,16 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 	}
 
 	history := &model.ConfigHistory{
-		ConfigID:   id,
-		ProjectID:  config.ProjectID,
-		Key:        config.Key,
-		OldValue:   oldConfig.Value,
-		NewValue:   config.Value,
-		ChangeType: "update",
-		Reason:     reason,
-		Operator:   operator,
-		CreatedAt:  time.Now(),
+		ConfigID:    id,
+		ProjectID:   config.ProjectID,
+		ProjectName: config.ProjectName,
+		Environment: config.Environment,
+		OldContent:  oldConfig.Content,
+		NewContent:  config.Content,
+		ChangeType:  "update",
+		Reason:      reason,
+		Operator:    operator,
+		CreatedAt:   time.Now(),
 	}
 
 	_, err = s.db.Database.Collection("config_history").InsertOne(ctx, history)
@@ -164,15 +182,16 @@ func (s *ConfigService) Delete(id string, operator string, reason string) error 
 	}
 
 	history := &model.ConfigHistory{
-		ConfigID:   id,
-		ProjectID:  config.ProjectID,
-		Key:        config.Key,
-		OldValue:   config.Value,
-		NewValue:   "",
-		ChangeType: "delete",
-		Reason:     reason,
-		Operator:   operator,
-		CreatedAt:  time.Now(),
+		ConfigID:    id,
+		ProjectID:   config.ProjectID,
+		ProjectName: config.ProjectName,
+		Environment: config.Environment,
+		OldContent:  config.Content,
+		NewContent:  "",
+		ChangeType:  "delete",
+		Reason:      reason,
+		Operator:    operator,
+		CreatedAt:   time.Now(),
 	}
 
 	_, err = s.db.Database.Collection("config_history").InsertOne(ctx, history)
@@ -186,6 +205,33 @@ func (s *ConfigService) GetHistory(configID string) ([]*model.ConfigHistory, err
 	cursor, err := s.db.Database.Collection("config_history").Find(
 		ctx,
 		bson.M{"configId": configID},
+		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var history []*model.ConfigHistory
+	if err = cursor.All(ctx, &history); err != nil {
+		return nil, err
+	}
+
+	return history, nil
+}
+
+func (s *ConfigService) GetHistoryByProject(projectID, environment string) ([]*model.ConfigHistory, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"projectId": projectID}
+	if environment != "" {
+		filter["environment"] = environment
+	}
+
+	cursor, err := s.db.Database.Collection("config_history").Find(
+		ctx,
+		filter,
 		options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}),
 	)
 	if err != nil {
@@ -226,14 +272,20 @@ func (s *ConfigService) CompareHistory(id1, id2 string) (map[string]interface{},
 		return nil, err
 	}
 
+	var content1, content2 map[string]interface{}
+	if history1.NewContent != "" {
+		json.Unmarshal([]byte(history1.NewContent), &content1)
+	}
+	if history2.NewContent != "" {
+		json.Unmarshal([]byte(history2.NewContent), &content2)
+	}
+
 	result := map[string]interface{}{
 		"history1": history1,
 		"history2": history2,
 		"diff": map[string]interface{}{
-			"key":       history1.Key == history2.Key,
-			"oldValue":  history1.OldValue,
-			"newValue1": history1.NewValue,
-			"newValue2": history2.NewValue,
+			"content1": content1,
+			"content2": content2,
 		},
 	}
 
@@ -241,23 +293,28 @@ func (s *ConfigService) CompareHistory(id1, id2 string) (map[string]interface{},
 }
 
 func (s *ConfigService) SubmitToGitLab(config *model.Config, gitlabMgr *GitLabMgr, operator string, reason string) (string, error) {
-	configJSON, err := json.MarshalIndent(config, "", "  ")
+	var configData interface{}
+	if err := json.Unmarshal([]byte(config.Content), &configData); err != nil {
+		return "", fmt.Errorf("invalid JSON content: %v", err)
+	}
+
+	configJSON, err := json.MarshalIndent(configData, "", "  ")
 	if err != nil {
 		return "", err
 	}
 
-	fileName := fmt.Sprintf("configs/%s/%s_%s.json", config.Environment, config.ProjectID, config.Key)
-	branchName := fmt.Sprintf("config-update-%s-%d", config.Key, time.Now().Unix())
-	commitMessage := fmt.Sprintf("Update config: %s\n\nReason: %s\nOperator: %s", config.Key, reason, operator)
+	fileName := fmt.Sprintf("configs/%s/%s.json", config.Environment, config.ProjectName)
+	branchName := fmt.Sprintf("config-update-%s-%s-%d", config.ProjectName, config.Environment, time.Now().Unix())
+	commitMessage := fmt.Sprintf("Update config: %s (%s)\n\nReason: %s\nOperator: %s", config.ProjectName, config.Environment, reason, operator)
 
 	err = gitlabMgr.CreateOrUpdateFile(fileName, string(configJSON), branchName, commitMessage)
 	if err != nil {
 		return "", err
 	}
 
-	mrTitle := fmt.Sprintf("配置更新: %s", config.Key)
-	mrDescription := fmt.Sprintf("**配置键**: %s\n**环境**: %s\n**修改原因**: %s\n**操作人**: %s",
-		config.Key, config.Environment, reason, operator)
+	mrTitle := fmt.Sprintf("配置更新: %s (%s)", config.ProjectName, config.Environment)
+	mrDescription := fmt.Sprintf("**项目**: %s\n**环境**: %s\n**修改原因**: %s\n**操作人**: %s",
+		config.ProjectName, config.Environment, reason, operator)
 
 	mrURL, err := gitlabMgr.CreateMergeRequest(branchName, "main", mrTitle, mrDescription)
 	if err != nil {

@@ -96,37 +96,27 @@ type Response struct {
 }
 
 type Config struct {
-	ID          string      `json:"id" bson:"_id,omitempty"`
-	ProjectID   string      `json:"projectId" bson:"projectId"`
-	Key         string      `json:"key" bson:"key"`
-	Value       string      `json:"value" bson:"value"`
-	Environment string      `json:"environment" bson:"environment"`
-	Description string      `json:"description" bson:"description"`
-	GrayConfig  *GrayConfig `json:"grayConfig,omitempty" bson:"grayConfig,omitempty"`
-	CreatedAt   time.Time   `json:"createdAt" bson:"createdAt"`
-	UpdatedAt   time.Time   `json:"updatedAt" bson:"updatedAt"`
-}
-
-type GrayConfig struct {
-	Enabled     bool     `json:"enabled" bson:"enabled"`
-	Strategy    string   `json:"strategy" bson:"strategy"`
-	Operators   []string `json:"operators,omitempty" bson:"operators,omitempty"`
-	Regions     []string `json:"regions,omitempty" bson:"regions,omitempty"`
-	Provinces   []string `json:"provinces,omitempty" bson:"provinces,omitempty"`
-	Datacenters []string `json:"datacenters,omitempty" bson:"datacenters,omitempty"`
-	Percentage  int      `json:"percentage,omitempty" bson:"percentage,omitempty"`
+	ID          string    `json:"id" bson:"_id,omitempty"`
+	ProjectID   string    `json:"projectId" bson:"projectId"`
+	ProjectName string    `json:"projectName" bson:"projectName"`
+	Environment string    `json:"environment" bson:"environment"`
+	Content     string    `json:"content" bson:"content"`
+	Description string    `json:"description" bson:"description"`
+	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
 }
 
 type ConfigHistory struct {
-	ID         string    `json:"id" bson:"_id,omitempty"`
-	ConfigID   string    `json:"configId" bson:"configId"`
-	ProjectID  string    `json:"projectId" bson:"projectId"`
-	Key        string    `json:"key" bson:"key"`
-	OldValue   string    `json:"oldValue" bson:"oldValue"`
-	NewValue   string    `json:"newValue" bson:"newValue"`
-	ChangeType string    `json:"changeType" bson:"changeType"`
-	Reason     string    `json:"reason" bson:"reason"`
-	Operator   string    `json:"operator" bson:"operator"`
-	GitLabMR   string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
-	CreatedAt  time.Time `json:"createdAt" bson:"createdAt"`
+	ID          string    `json:"id" bson:"_id,omitempty"`
+	ConfigID    string    `json:"configId" bson:"configId"`
+	ProjectID   string    `json:"projectId" bson:"projectId"`
+	ProjectName string    `json:"projectName" bson:"projectName"`
+	Environment string    `json:"environment" bson:"environment"`
+	OldContent  string    `json:"oldContent" bson:"oldContent"`
+	NewContent  string    `json:"newContent" bson:"newContent"`
+	ChangeType  string    `json:"changeType" bson:"changeType"`
+	Reason      string    `json:"reason" bson:"reason"`
+	Operator    string    `json:"operator" bson:"operator"`
+	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
+	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 }
