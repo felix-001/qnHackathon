@@ -4,6 +4,7 @@
   become: yes # 提权操作
   vars:
     # 可配置参数 - 根据实际需求修改
+    ansible_python_interpreter: /usr/bin/python3
     bin_name: "mybin1" # 组件|服务名称
     bin_tar: "{{ bin_name }}.tar.gz" # 软件包名称
     bin_tar_url: "http://101.133.131.188:38019/files/mybin1.tar.gz" # 下载URL
@@ -14,6 +15,12 @@
     bin_extract_full_path: "{{ bin_extract_dir }}/{{ bin_name }}" # 二进制文件路径， 待部署是覆盖到服务真正运行的目录
 
   tasks:
+    - name: 打印执行环境信息
+      debug:
+        msg:
+          - "执行用户: {{ ansible_user }}"
+          - "执行目录: {{ playbook_dir }}"
+          - "PATH 变量: {{ ansible_env.PATH }}"
     - name: 确保下载目录存在
       ansible.builtin.file:
         path: "{{ download_dir }}"

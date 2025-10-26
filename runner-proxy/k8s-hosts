@@ -1,14 +1,11 @@
 [k8s]
 101.133.131.188
 
-[k8s:vars]
-ansible_user=root
-max_connections=1000
-
-# 全局变量：对所有主机生效（谨慎使用）
 [all:vars]
 ansible_ssh_common_args="-o StrictHostKeyChecking=no"
-# ansible_python_interpreter=/usr/bin/python3
+ansible_python_interpreter=/usr/bin/python3
+ansible_user=root
+max_connections=1000
 
 # 5. 动态主机清单（引用外部脚本/文件）
 # 若需要动态生成主机列表（如从云平台获取），可指定可执行脚本路径
