@@ -211,6 +211,34 @@ func (h *ConfigHandler) GetHistory(c *gin.Context) {
 	})
 }
 
+func (h *ConfigHandler) GetHistoryByProject(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: "projectId is required",
+		})
+		return
+	}
+
+	history, err := h.configService.GetHistoryByProject(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    history,
+	})
+}
+
 func (h *ConfigHandler) Compare(c *gin.Context) {
 	id1 := c.Query("id1")
 	id2 := c.Query("id2")
