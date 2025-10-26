@@ -94,6 +94,7 @@ func main() {
 		api.GET("/configs/:id/history", configHandler.GetHistory)
 		api.GET("/configs/history", configHandler.GetHistoryByProject)
 		api.GET("/configs/compare", configHandler.Compare)
+		api.GET("/configs/versions", configHandler.GetVersions)
 
 		api.GET("/gray-releases", grayReleaseHandler.List)
 		api.POST("/gray-releases", grayReleaseHandler.Create)

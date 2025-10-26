@@ -105,6 +105,7 @@
                         <th>项目名称</th>
                         <th>环境</th>
                         <th>配置文件</th>
+                        <th>版本</th>
                         <th>描述</th>
                         <th>最后更新</th>
                         <th>操作</th>
@@ -112,7 +113,7 @@
                 </thead>
                 <tbody id="configList">
                     <tr>
-                        <td colspan="6" style="text-align: center; color: #999;">加载中...</td>
+                        <td colspan="7" style="text-align: center; color: #999;">加载中...</td>
                     </tr>
                 </tbody>
             </table>
@@ -233,7 +234,7 @@
                 </div>
                 <div class="form-group">
                     <label>环境 <span style="color: red;">*</span></label>
-                    <select id="grayEnvironment" required>
+                    <select id="grayEnvironment" required onchange="loadVersionsForGray()">
                         <option value="dev">开发环境</option>
                         <option value="test">测试环境</option>
                         <option value="prod">生产环境</option>
@@ -241,7 +242,9 @@
                 </div>
                 <div class="form-group">
                     <label>版本 <span style="color: red;">*</span></label>
-                    <input type="text" id="grayVersion" required placeholder="例如: v1.2.0">
+                    <div id="versionCheckboxes" style="padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                        <div style="color: #999; text-align: center; padding: 20px;">请先选择项目和环境</div>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>灰度规则 <span style="color: red;">*</span></label>
@@ -349,14 +352,14 @@
                 }
             } catch (error) {
                 console.error('加载配置失败:', error);
-                document.getElementById('configList').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
+                document.getElementById('configList').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
             }
         }
 
         function renderConfigs() {
             const tbody = document.getElementById('configList');
             if (configs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无配置数据，点击"新建配置"开始创建</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无配置数据，点击"新建配置"开始创建</td></tr>';
                 return;
             }
             
@@ -364,12 +367,14 @@
                 const updateTime = new Date(config.updatedAt).toLocaleString('zh-CN');
                 const envName = getEnvName(config.environment);
                 const fileName = `${config.projectName}.json`;
+                const version = config.version || 1;
                 
                 return `
                     <tr>
                         <td><strong>${config.projectName}</strong></td>
                         <td><span class="tag">${envName}</span></td>
                         <td><code>${fileName}</code></td>
+                        <td><span class="tag" style="background: #e6f7ff; color: #1890ff;">v${version}</span></td>
                         <td>${config.description || '-'}</td>
                         <td>${updateTime}</td>
                         <td>
@@ -746,6 +751,41 @@
             if (selectedOption && selectedOption.dataset.name) {
                 window.currentGrayProjectName = selectedOption.dataset.name;
             }
+            loadVersionsForGray();
+        }
+
+        async function loadVersionsForGray() {
+            const projectId = document.getElementById('grayProjectId').value;
+            const environment = document.getElementById('grayEnvironment').value;
+            
+            const container = document.getElementById('versionCheckboxes');
+            
+            if (!projectId || !environment) {
+                container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">请先选择项目和环境</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/configs/versions?projectId=${projectId}&environment=${environment}`);
+                const data = await response.json();
+                
+                if (data.code === 200 && data.data && data.data.length > 0) {
+                    const versions = data.data;
+                    container.innerHTML = versions.map(v => `
+                        <div style="padding: 4px 0;">
+                            <label style="cursor: pointer; display: flex; align-items: center;">
+                                <input type="checkbox" name="versionCheck" value="${v}" style="margin-right: 8px;">
+                                <span>v${v}</span>
+                            </label>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">该项目和环境下暂无配置版本</div>';
+                }
+            } catch (error) {
+                console.error('加载版本失败:', error);
+                container.innerHTML = '<div style="color: #f5222d; text-align: center; padding: 20px;">加载失败</div>';
+            }
         }
 
         async function loadGrayReleases() {
@@ -857,12 +897,18 @@
         async function saveGrayRelease() {
             const projectId = document.getElementById('grayProjectId').value;
             const environment = document.getElementById('grayEnvironment').value;
-            const version = document.getElementById('grayVersion').value;
             const description = document.getElementById('grayDescription').value;
             const operator = document.getElementById('grayOperator').value;
             const rules = getRules();
 
-            if (!projectId || !environment || !version || !operator) {
+            const selectedVersions = Array.from(document.querySelectorAll('input[name="versionCheck"]:checked')).map(cb => `v${cb.value}`);
+            if (selectedVersions.length === 0) {
+                alert('请至少选择一个版本');
+                return;
+            }
+            const version = selectedVersions.join(',');
+
+            if (!projectId || !environment || !operator) {
                 alert('请填写所有必填项');
                 return;
             }
@@ -925,8 +971,15 @@
                     document.getElementById('grayProjectId').value = release.projectId;
                     window.currentGrayProjectName = release.projectName;
                     document.getElementById('grayEnvironment').value = release.environment;
-                    document.getElementById('grayVersion').value = release.version;
                     document.getElementById('grayDescription').value = release.description || '';
+                    
+                    await loadVersionsForGray();
+                    
+                    const selectedVersions = release.version.split(',').map(v => v.replace('v', ''));
+                    selectedVersions.forEach(v => {
+                        const checkbox = document.querySelector(`input[name="versionCheck"][value="${v}"]`);
+                        if (checkbox) checkbox.checked = true;
+                    });
                     
                     const container = document.getElementById('rulesContainer');
                     container.innerHTML = '';

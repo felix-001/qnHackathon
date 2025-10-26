@@ -84,6 +84,12 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	maxVersion, err := s.getMaxVersion(config.ProjectID, config.Environment)
+	if err != nil && err.Error() != "mongo: no documents in result" {
+		return err
+	}
+	config.Version = maxVersion + 1
+
 	config.CreatedAt = time.Now()
 	config.UpdatedAt = time.Now()
 
@@ -126,6 +132,12 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 		return err
 	}
 
+	maxVersion, err := s.getMaxVersion(config.ProjectID, config.Environment)
+	if err != nil && err.Error() != "mongo: no documents in result" {
+		return err
+	}
+	config.Version = maxVersion + 1
+
 	config.UpdatedAt = time.Now()
 	config.ID = id
 
@@ -137,6 +149,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 			"fileName":    config.FileName,
 			"content":     config.Content,
 			"description": config.Description,
+			"version":     config.Version,
 			"updatedAt":   config.UpdatedAt,
 		},
 	}
@@ -293,5 +306,53 @@ func (s *ConfigService) CompareHistory(id1, id2 string) (map[string]interface{},
 	}
 
 	return result, nil
+}
+
+func (s *ConfigService) getMaxVersion(projectID, environment string) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	opts := options.FindOne().SetSort(bson.D{{Key: "version", Value: -1}})
+	var config model.Config
+	err := s.db.Database.Collection("configs").FindOne(ctx, bson.M{
+		"projectId":   projectID,
+		"environment": environment,
+	}, opts).Decode(&config)
+
+	if err != nil {
+		return 0, err
+	}
+
+	return config.Version, nil
+}
+
+func (s *ConfigService) GetVersions(projectID, environment string) ([]int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cursor, err := s.db.Database.Collection("configs").Find(
+		ctx,
+		bson.M{
+			"projectId":   projectID,
+			"environment": environment,
+		},
+		options.Find().SetSort(bson.D{{Key: "version", Value: -1}}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var configs []*model.Config
+	if err = cursor.All(ctx, &configs); err != nil {
+		return nil, err
+	}
+
+	versions := make([]int, len(configs))
+	for i, config := range configs {
+		versions[i] = config.Version
+	}
+
+	return versions, nil
 }
 
