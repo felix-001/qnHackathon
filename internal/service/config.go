@@ -295,3 +295,174 @@ func (s *ConfigService) CompareHistory(id1, id2 string) (map[string]interface{},
 	return result, nil
 }
 
+func (s *ConfigService) CreateRollout(historyID string, targets []model.GrayscaleTarget, operator string, reason string) (*model.ConfigRollout, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(historyID)
+	if err != nil {
+		return nil, err
+	}
+
+	var history model.ConfigHistory
+	err = s.db.Database.Collection("config_history").FindOne(ctx, bson.M{"_id": objID}).Decode(&history)
+	if err != nil {
+		return nil, err
+	}
+
+	rollout := &model.ConfigRollout{
+		ConfigID:    history.ConfigID,
+		HistoryID:   historyID,
+		ProjectID:   history.ProjectID,
+		ProjectName: history.ProjectName,
+		Environment: history.Environment,
+		Targets:     targets,
+		DeviceCount: 0,
+		Status:      "active",
+		Operator:    operator,
+		Reason:      reason,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	result, err := s.db.Database.Collection("config_rollouts").InsertOne(ctx, rollout)
+	if err != nil {
+		return nil, err
+	}
+
+	rollout.ID = result.InsertedID.(primitive.ObjectID).Hex()
+	return rollout, nil
+}
+
+func (s *ConfigService) ListRollouts(projectID, environment string) ([]*model.ConfigRollout, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{}
+	if projectID != "" {
+		filter["projectId"] = projectID
+	}
+	if environment != "" {
+		filter["environment"] = environment
+	}
+
+	cursor, err := s.db.Database.Collection("config_rollouts").Find(ctx, filter, options.Find().SetSort(bson.D{{Key: "createdAt", Value: -1}}))
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var rollouts []*model.ConfigRollout
+	if err = cursor.All(ctx, &rollouts); err != nil {
+		return nil, err
+	}
+
+	for _, rollout := range rollouts {
+		count, err := s.db.Database.Collection("device_configs").CountDocuments(ctx, bson.M{
+			"rolloutId": rollout.ID,
+		})
+		if err == nil {
+			rollout.DeviceCount = int(count)
+		}
+	}
+
+	return rollouts, nil
+}
+
+func (s *ConfigService) PublishAll(historyID string, operator string, reason string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	objID, err := primitive.ObjectIDFromHex(historyID)
+	if err != nil {
+		return err
+	}
+
+	var history model.ConfigHistory
+	err = s.db.Database.Collection("config_history").FindOne(ctx, bson.M{"_id": objID}).Decode(&history)
+	if err != nil {
+		return err
+	}
+
+	rollout := &model.ConfigRollout{
+		ConfigID:    history.ConfigID,
+		HistoryID:   historyID,
+		ProjectID:   history.ProjectID,
+		ProjectName: history.ProjectName,
+		Environment: history.Environment,
+		Targets:     []model.GrayscaleTarget{},
+		DeviceCount: 0,
+		Status:      "completed",
+		Operator:    operator,
+		Reason:      reason,
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
+	}
+
+	now := time.Now()
+	rollout.CompletedAt = &now
+
+	_, err = s.db.Database.Collection("config_rollouts").InsertOne(ctx, rollout)
+	return err
+}
+
+func (s *ConfigService) GetDeviceStats(projectID, environment string) (map[string]interface{}, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	filter := bson.M{"projectId": projectID}
+	if environment != "" {
+		filter["environment"] = environment
+	}
+
+	pipeline := []bson.M{
+		{"$match": filter},
+		{"$group": bson.M{
+			"_id": "$historyId",
+			"count": bson.M{"$sum": 1},
+			"configId": bson.M{"$first": "$configId"},
+			"projectId": bson.M{"$first": "$projectId"},
+			"environment": bson.M{"$first": "$environment"},
+		}},
+	}
+
+	cursor, err := s.db.Database.Collection("device_configs").Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []map[string]interface{}
+	if err = cursor.All(ctx, &results); err != nil {
+		return nil, err
+	}
+
+	versionStats := make(map[string]interface{})
+	for _, result := range results {
+		historyID := result["_id"].(string)
+		count := result["count"]
+
+		objID, err := primitive.ObjectIDFromHex(historyID)
+		if err != nil {
+			continue
+		}
+
+		var history model.ConfigHistory
+		err = s.db.Database.Collection("config_history").FindOne(ctx, bson.M{"_id": objID}).Decode(&history)
+		if err != nil {
+			continue
+		}
+
+		versionStats[historyID] = map[string]interface{}{
+			"historyId":   historyID,
+			"deviceCount": count,
+			"operator":    history.Operator,
+			"createdAt":   history.CreatedAt,
+		}
+	}
+
+	return map[string]interface{}{
+		"versionStats": versionStats,
+	}, nil
+}
+

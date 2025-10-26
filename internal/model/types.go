@@ -122,3 +122,44 @@ type ConfigHistory struct {
 	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 }
+
+// GrayscaleTarget represents a target for grayscale rollout
+type GrayscaleTarget struct {
+	Type  string `json:"type" bson:"type"`   // operator, region, province, datacenter
+	Value string `json:"value" bson:"value"` // specific value for the type
+}
+
+// ConfigRollout represents a grayscale rollout configuration
+type ConfigRollout struct {
+	ID            string            `json:"id" bson:"_id,omitempty"`
+	ConfigID      string            `json:"configId" bson:"configId"`
+	HistoryID     string            `json:"historyId" bson:"historyId"`
+	ProjectID     string            `json:"projectId" bson:"projectId"`
+	ProjectName   string            `json:"projectName" bson:"projectName"`
+	Environment   string            `json:"environment" bson:"environment"`
+	Targets       []GrayscaleTarget `json:"targets" bson:"targets"`
+	DeviceCount   int               `json:"deviceCount" bson:"deviceCount"`
+	Status        string            `json:"status" bson:"status"` // pending, active, completed, cancelled
+	Operator      string            `json:"operator" bson:"operator"`
+	Reason        string            `json:"reason" bson:"reason"`
+	CreatedAt     time.Time         `json:"createdAt" bson:"createdAt"`
+	UpdatedAt     time.Time         `json:"updatedAt" bson:"updatedAt"`
+	CompletedAt   *time.Time        `json:"completedAt,omitempty" bson:"completedAt,omitempty"`
+}
+
+// DeviceConfig represents the configuration assigned to a specific device
+type DeviceConfig struct {
+	ID          string    `json:"id" bson:"_id,omitempty"`
+	DeviceID    string    `json:"deviceId" bson:"deviceId"`
+	ConfigID    string    `json:"configId" bson:"configId"`
+	HistoryID   string    `json:"historyId" bson:"historyId"`
+	ProjectID   string    `json:"projectId" bson:"projectId"`
+	Environment string    `json:"environment" bson:"environment"`
+	RolloutID   string    `json:"rolloutId,omitempty" bson:"rolloutId,omitempty"`
+	Operator    string    `json:"operator" bson:"operator"`
+	Region      string    `json:"region" bson:"region"`
+	Province    string    `json:"province" bson:"province"`
+	Datacenter  string    `json:"datacenter" bson:"datacenter"`
+	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
+}

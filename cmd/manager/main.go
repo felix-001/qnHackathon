@@ -92,6 +92,10 @@ func main() {
 		api.GET("/configs/:id/history", configHandler.GetHistory)
 		api.GET("/configs/history", configHandler.GetHistoryByProject)
 		api.GET("/configs/compare", configHandler.Compare)
+		api.POST("/configs/rollouts", configHandler.CreateRollout)
+		api.GET("/configs/rollouts", configHandler.ListRollouts)
+		api.POST("/configs/publish", configHandler.PublishAll)
+		api.GET("/configs/device-stats", configHandler.GetDeviceStats)
 
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)

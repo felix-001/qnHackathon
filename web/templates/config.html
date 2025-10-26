@@ -168,6 +168,43 @@
         </div>
     </div>
 
+    <div id="grayscaleModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">灰度发布</div>
+            <form id="grayscaleForm" onsubmit="return false;">
+                <input type="hidden" id="grayscaleHistoryId">
+                <div class="form-group">
+                    <label>灰度维度 <span style="color: red;">*</span></label>
+                    <div id="grayscaleTargets">
+                        <div class="target-item" style="margin-bottom: 12px;">
+                            <select class="target-type" style="width: 30%; margin-right: 8px;" required>
+                                <option value="">选择维度</option>
+                                <option value="operator">运营商</option>
+                                <option value="region">大区</option>
+                                <option value="province">省份</option>
+                                <option value="datacenter">机房</option>
+                            </select>
+                            <input type="text" class="target-value" placeholder="输入具体值 (如: 移动, 华东, 北京, IDC1)" style="width: 60%;" required>
+                        </div>
+                    </div>
+                    <button type="button" class="btn" style="background: #52c41a; font-size: 12px;" onclick="addTargetField()">+ 添加维度</button>
+                </div>
+                <div class="form-group">
+                    <label>操作人 <span style="color: red;">*</span></label>
+                    <input type="text" id="grayscaleOperator" required placeholder="输入操作人姓名">
+                </div>
+                <div class="form-group">
+                    <label>灰度原因 <span style="color: red;">*</span></label>
+                    <input type="text" id="grayscaleReason" required placeholder="说明灰度发布原因">
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn" style="background: #d9d9d9; color: #333;" onclick="hideGrayscaleModal()">取消</button>
+                    <button type="button" class="btn" onclick="submitGrayscale()">确认灰度</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script>
         let projects = [];
         let configs = [];
@@ -428,6 +465,13 @@
                     compareBtn = `<button class="btn action-btn" onclick="showCompare('${item.id}', '${history[index + 1].id}')">与上一版本对比</button>`;
                 }
                 
+                let grayscaleBtn = '';
+                let publishBtn = '';
+                if (item.changeType !== 'delete') {
+                    grayscaleBtn = `<button class="btn action-btn" style="background: #faad14;" onclick="showGrayscaleModal('${item.id}')">灰度</button>`;
+                    publishBtn = `<button class="btn action-btn" style="background: #52c41a;" onclick="confirmPublish('${item.id}')">发布</button>`;
+                }
+                
                 const checkboxDisabled = item.changeType === 'delete' ? 'disabled' : '';
                 
                 return `
@@ -440,7 +484,11 @@
                         <div>操作人: ${item.operator}</div>
                         <div>原因: ${item.reason}</div>
                         ${item.gitlabMR ? `<div>GitLab MR: <a href="${item.gitlabMR}" target="_blank">${item.gitlabMR}</a></div>` : ''}
-                        ${compareBtn}
+                        <div style="margin-top: 8px;">
+                            ${compareBtn}
+                            ${grayscaleBtn}
+                            ${publishBtn}
+                        </div>
                     </div>
                 `;
             }).join('');
@@ -588,6 +636,139 @@
 
         function hideCompareModal() {
             document.getElementById('compareModal').classList.remove('active');
+        }
+
+        function showGrayscaleModal(historyId) {
+            document.getElementById('grayscaleHistoryId').value = historyId;
+            document.getElementById('grayscaleForm').reset();
+            document.getElementById('grayscaleHistoryId').value = historyId;
+            
+            document.getElementById('grayscaleTargets').innerHTML = `
+                <div class="target-item" style="margin-bottom: 12px;">
+                    <select class="target-type" style="width: 30%; margin-right: 8px;" required>
+                        <option value="">选择维度</option>
+                        <option value="operator">运营商</option>
+                        <option value="region">大区</option>
+                        <option value="province">省份</option>
+                        <option value="datacenter">机房</option>
+                    </select>
+                    <input type="text" class="target-value" placeholder="输入具体值 (如: 移动, 华东, 北京, IDC1)" style="width: 60%;" required>
+                </div>
+            `;
+            
+            document.getElementById('grayscaleModal').classList.add('active');
+        }
+
+        function hideGrayscaleModal() {
+            document.getElementById('grayscaleModal').classList.remove('active');
+        }
+
+        function addTargetField() {
+            const container = document.getElementById('grayscaleTargets');
+            const newField = document.createElement('div');
+            newField.className = 'target-item';
+            newField.style.marginBottom = '12px';
+            newField.innerHTML = `
+                <select class="target-type" style="width: 30%; margin-right: 8px;" required>
+                    <option value="">选择维度</option>
+                    <option value="operator">运营商</option>
+                    <option value="region">大区</option>
+                    <option value="province">省份</option>
+                    <option value="datacenter">机房</option>
+                </select>
+                <input type="text" class="target-value" placeholder="输入具体值 (如: 移动, 华东, 北京, IDC1)" style="width: 50%;" required>
+                <button type="button" class="btn btn-danger action-btn" onclick="this.parentElement.remove()" style="width: 15%;">删除</button>
+            `;
+            container.appendChild(newField);
+        }
+
+        async function submitGrayscale() {
+            const historyId = document.getElementById('grayscaleHistoryId').value;
+            const operator = document.getElementById('grayscaleOperator').value;
+            const reason = document.getElementById('grayscaleReason').value;
+
+            if (!operator || !reason) {
+                alert('请填写必填项');
+                return;
+            }
+
+            const targetItems = document.querySelectorAll('.target-item');
+            const targets = [];
+            
+            for (let item of targetItems) {
+                const type = item.querySelector('.target-type').value;
+                const value = item.querySelector('.target-value').value;
+                
+                if (!type || !value) {
+                    alert('请完整填写所有灰度维度');
+                    return;
+                }
+                
+                targets.push({ type, value });
+            }
+
+            if (targets.length === 0) {
+                alert('请至少添加一个灰度维度');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/v1/configs/rollouts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        historyId: historyId,
+                        targets: targets,
+                        operator: operator,
+                        reason: reason
+                    })
+                });
+
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('灰度发布创建成功！');
+                    hideGrayscaleModal();
+                    hideHistoryModal();
+                } else {
+                    alert('灰度发布失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('灰度发布失败:', error);
+                alert('灰度发布失败');
+            }
+        }
+
+        async function confirmPublish(historyId) {
+            const operator = prompt('请输入操作人:');
+            if (!operator) return;
+            
+            const reason = prompt('请输入发布原因:');
+            if (!reason) return;
+
+            if (!confirm('确定要全量发布此配置版本吗？')) return;
+
+            try {
+                const response = await fetch('/api/v1/configs/publish', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        historyId: historyId,
+                        operator: operator,
+                        reason: reason
+                    })
+                });
+
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('全量发布成功！');
+                    hideHistoryModal();
+                } else {
+                    alert('发布失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('发布失败:', error);
+                alert('发布失败');
+            }
         }
 
         init();

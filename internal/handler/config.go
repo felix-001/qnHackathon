@@ -234,3 +234,115 @@ func (h *ConfigHandler) Compare(c *gin.Context) {
 		Data:    result,
 	})
 }
+
+type CreateRolloutRequest struct {
+	HistoryID string                  `json:"historyId"`
+	Targets   []model.GrayscaleTarget `json:"targets"`
+	Operator  string                  `json:"operator"`
+	Reason    string                  `json:"reason"`
+}
+
+func (h *ConfigHandler) CreateRollout(c *gin.Context) {
+	var req CreateRolloutRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	rollout, err := h.configService.CreateRollout(req.HistoryID, req.Targets, req.Operator, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    rollout,
+	})
+}
+
+func (h *ConfigHandler) ListRollouts(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	rollouts, err := h.configService.ListRollouts(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    rollouts,
+	})
+}
+
+type PublishRequest struct {
+	HistoryID string `json:"historyId"`
+	Operator  string `json:"operator"`
+	Reason    string `json:"reason"`
+}
+
+func (h *ConfigHandler) PublishAll(c *gin.Context) {
+	var req PublishRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	err := h.configService.PublishAll(req.HistoryID, req.Operator, req.Reason)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+	})
+}
+
+func (h *ConfigHandler) GetDeviceStats(c *gin.Context) {
+	projectID := c.Query("projectId")
+	environment := c.Query("environment")
+
+	if projectID == "" {
+		c.JSON(http.StatusBadRequest, model.Response{
+			Code:    400,
+			Message: "projectId is required",
+		})
+		return
+	}
+
+	stats, err := h.configService.GetDeviceStats(projectID, environment)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, model.Response{
+			Code:    500,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, model.Response{
+		Code:    200,
+		Message: "success",
+		Data:    stats,
+	})
+}
