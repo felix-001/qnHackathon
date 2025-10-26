@@ -856,23 +856,67 @@
             document.getElementById('grayModal').classList.add('active');
         }
 
+        const dimensionDefaults = {
+            'isp': ['电信', '联通', '移动', '教育网', '铁通', '长城宽带'],
+            'region': ['华北', '华东', '华南', '华中', '西南', '西北', '东北'],
+            'province': ['北京', '上海', '广东', '浙江', '江苏', '四川', '湖北', '河南', '山东', '福建'],
+            'datacenter': ['IDC1', 'IDC2', 'IDC3', 'AWS', '阿里云', '腾讯云']
+        };
+
         function addRule() {
             const container = document.getElementById('rulesContainer');
             const ruleId = `rule_${ruleCounter++}`;
             const ruleHtml = `
                 <div class="rule-item" id="${ruleId}">
-                    <select class="rule-dimension">
+                    <select class="rule-dimension" onchange="updateRuleDefaults('${ruleId}')">
                         <option value="">选择维度</option>
                         <option value="isp">运营商</option>
                         <option value="region">大区</option>
                         <option value="province">省份</option>
                         <option value="datacenter">机房</option>
                     </select>
-                    <input type="text" class="rule-values" placeholder="输入值，多个值用逗号分隔，如: 电信,联通">
+                    <div style="flex: 2; display: flex; flex-direction: column; gap: 4px;">
+                        <input type="text" class="rule-values" placeholder="输入值，多个值用逗号分隔，如: 电信,联通">
+                        <div class="rule-defaults" style="display: none; padding: 4px; background: #f9f9f9; border-radius: 4px;">
+                            <div style="font-size: 12px; color: #666; margin-bottom: 4px;">常用值（点击添加）:</div>
+                            <div class="default-values" style="display: flex; flex-wrap: wrap; gap: 4px;"></div>
+                        </div>
+                    </div>
                     <button type="button" class="btn btn-danger" onclick="removeRule('${ruleId}')" style="padding: 4px 8px; font-size: 12px;">删除</button>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', ruleHtml);
+        }
+
+        function updateRuleDefaults(ruleId) {
+            const ruleItem = document.getElementById(ruleId);
+            const dimension = ruleItem.querySelector('.rule-dimension').value;
+            const defaultsContainer = ruleItem.querySelector('.rule-defaults');
+            const defaultValuesDiv = ruleItem.querySelector('.default-values');
+            
+            if (dimension && dimensionDefaults[dimension]) {
+                defaultValuesDiv.innerHTML = dimensionDefaults[dimension].map(value => 
+                    `<span style="padding: 2px 8px; background: #e6f7ff; color: #1890ff; border-radius: 3px; cursor: pointer; font-size: 12px;" onclick="addValueToRule('${ruleId}', '${value}')">${value}</span>`
+                ).join('');
+                defaultsContainer.style.display = 'block';
+            } else {
+                defaultsContainer.style.display = 'none';
+            }
+        }
+
+        function addValueToRule(ruleId, value) {
+            const ruleItem = document.getElementById(ruleId);
+            const input = ruleItem.querySelector('.rule-values');
+            const currentValues = input.value.trim();
+            
+            if (currentValues === '') {
+                input.value = value;
+            } else {
+                const values = currentValues.split(',').map(v => v.trim());
+                if (!values.includes(value)) {
+                    input.value = currentValues + ', ' + value;
+                }
+            }
         }
 
         function removeRule(ruleId) {
@@ -988,8 +1032,10 @@
                     release.rules.forEach(rule => {
                         addRule();
                         const lastRule = container.lastElementChild;
+                        const ruleId = lastRule.id;
                         lastRule.querySelector('.rule-dimension').value = rule.dimension;
                         lastRule.querySelector('.rule-values').value = rule.values.join(', ');
+                        updateRuleDefaults(ruleId);
                     });
                     
                     document.getElementById('grayModal').classList.add('active');
