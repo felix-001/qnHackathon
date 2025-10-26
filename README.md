@@ -127,14 +127,14 @@ go run cmd/manager/main.go -f internal/config/manager.json
 - [ ] 完善单元测试
 
 # jenkins地址
-http://101.133.131.188:38010
-用户名:admin
-密码：e99c6614893247c2aa2b7b1b3f964517
+- http://101.133.131.188:38010
+- 用户名:admin
+- 密码：e99c6614893247c2aa2b7b1b3f964517
 
 # gitlab地址
-http://101.133.131.188:30811
-用户名: root
-密码: ofB4koHkZe6J5uqmrkBcH5tm/fpCPEcR1ol6YdQAUd0=
+- http://101.133.131.188:30811
+- 用户名: root
+- 密码: ofB4koHkZe6J5uqmrkBcH5tm/fpCPEcR1ol6YdQAUd0=
 
 # 项目演示地址
 http://101.133.131.188:38012/
