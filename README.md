@@ -138,3 +138,7 @@ go run cmd/manager/main.go -f internal/config/manager.json
 
 # 项目演示地址
 http://101.133.131.188:38012/
+
+# 模拟业务服务地址
+- https://gitee.com/swayinwind/streamd.git
+- 服务启动后，会启动一个web服务，在web上展示服务的版本号
