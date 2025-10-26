@@ -135,3 +135,6 @@ http://101.133.131.188:38010
 http://101.133.131.188:30811
 用户名: root
 密码: ofB4koHkZe6J5uqmrkBcH5tm/fpCPEcR1ol6YdQAUd0=
+
+# 项目演示地址
+http://101.133.131.188:38012/
