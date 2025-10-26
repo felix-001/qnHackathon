@@ -91,7 +91,7 @@ func (s *ConfigService) Create(config *model.Config, operator string, reason str
 	if err != nil && err.Error() != "mongo: no documents in result" {
 		return err
 	}
-	config.Version = incrementVersion(maxVersion)
+	config.Version = model.FlexibleVersion(incrementVersion(maxVersion))
 
 	config.CreatedAt = time.Now()
 	config.UpdatedAt = time.Now()
@@ -141,7 +141,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 	if err != nil && err.Error() != "mongo: no documents in result" {
 		return err
 	}
-	config.Version = incrementVersion(maxVersion)
+	config.Version = model.FlexibleVersion(incrementVersion(maxVersion))
 
 	config.UpdatedAt = time.Now()
 	config.ID = id
@@ -154,7 +154,7 @@ func (s *ConfigService) Update(id string, config *model.Config, operator string,
 			"fileName":    config.FileName,
 			"content":     config.Content,
 			"description": config.Description,
-			"version":     config.Version,
+			"version":     config.Version.String(),
 			"approver":    config.Approver,
 			"updatedAt":   config.UpdatedAt,
 		},
@@ -332,7 +332,7 @@ func (s *ConfigService) getMaxVersion(projectID, environment string) (string, er
 		return "", err
 	}
 
-	return config.Version, nil
+	return config.Version.String(), nil
 }
 
 func (s *ConfigService) GetVersions(projectID, environment string) ([]string, error) {
@@ -359,7 +359,7 @@ func (s *ConfigService) GetVersions(projectID, environment string) ([]string, er
 
 	versions := make([]string, len(configs))
 	for i, config := range configs {
-		versions[i] = config.Version
+		versions[i] = config.Version.String()
 	}
 
 	return versions, nil
@@ -413,7 +413,7 @@ func (s *ConfigService) Rollback(configID, historyID, operator, reason string) e
 	if err != nil && err.Error() != "mongo: no documents in result" {
 		return err
 	}
-	newVersion := incrementVersion(maxVersion)
+	newVersion := model.FlexibleVersion(incrementVersion(maxVersion))
 
 	rollbackContent := history.NewContent
 	if rollbackContent == "" {
@@ -423,7 +423,7 @@ func (s *ConfigService) Rollback(configID, historyID, operator, reason string) e
 	update := bson.M{
 		"$set": bson.M{
 			"content":   rollbackContent,
-			"version":   newVersion,
+			"version":   newVersion.String(),
 			"updatedAt": time.Now(),
 		},
 	}
