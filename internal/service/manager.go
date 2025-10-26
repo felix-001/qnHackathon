@@ -31,30 +31,30 @@ func (m *Manager) Build() *BuildInfo {
 
 	buildResult := m.jenkinsMgr.WaitForJobCompletion()
 	if buildResult == nil || !buildResult.IsSuccess {
-		log.Logger.Error().Msg("Jenkins build failed or timed out")
+		log.Error().Msg("Jenkins 构建失败或超时")
 		return nil
 	}
 
 	streamdPath, err := m.jenkinsMgr.DownloadBin(buildResult, "streamd")
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to download streamd")
+		log.Error().Err(err).Msg("下载 streamd 失败")
 		return nil
 	}
-	log.Logger.Info().Msgf("Successfully downloaded streamd to: %s", streamdPath)
+	log.Info().Str("path", streamdPath).Msg("下载 streamd 成功")
 
 	parts := strings.Split(streamdPath, "/")
 	if len(parts) != 3 {
-		log.Logger.Info().Msgf("parse streamdPath err")
+		log.Error().Str("path", streamdPath).Msg("解析 streamdPath 失败")
 		return nil
 	}
 
 	m.gitlabMgr.UpdateVersion("streamd.json", parts[2])
 	mrUrl := m.gitlabMgr.GetMrUrl(parts[2])
 	if mrUrl == "" {
-		log.Logger.Error().Msg("GetMrUrl: 无法获取 MergeRequest URL")
+		log.Error().Msg("无法获取 MergeRequest URL")
 		return nil
 	}
-	log.Logger.Info().Msgf("GetMrUrl: %s", mrUrl)
+	log.Info().Str("url", mrUrl).Msg("获取 MR URL 成功")
 
 	return &BuildInfo{
 		GitlabPRURL: mrUrl,
