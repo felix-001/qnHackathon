@@ -1,5 +1,5 @@
 ---
-- name: 下载并安装软件包
+- name: 下载并解压 bin 二进制
   hosts: all
   become: yes # 提权操作
   vars:
