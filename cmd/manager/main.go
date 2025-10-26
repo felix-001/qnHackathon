@@ -91,6 +91,7 @@ func main() {
 		api.GET("/configs/:id", configHandler.Get)
 		api.PUT("/configs/:id", configHandler.Update)
 		api.DELETE("/configs/:id", configHandler.Delete)
+		api.POST("/configs/:id/rollback", configHandler.Rollback)
 		api.GET("/configs/:id/history", configHandler.GetHistory)
 		api.GET("/configs/history", configHandler.GetHistoryByProject)
 		api.GET("/configs/compare", configHandler.Compare)
