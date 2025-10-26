@@ -14,12 +14,18 @@
         .menu-item:hover { background: #e6f7ff; }
         .menu-item.active { background: #1890ff; color: white; }
         .content { flex: 1; padding: 24px; background: #fff; margin: 24px; }
-        .btn { padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-bottom: 16px; }
+        .btn { padding: 8px 16px; background: #1890ff; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 8px; }
         .btn:hover { background: #40a9ff; }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #f0f0f0; }
-        th { background: #fafafa; font-weight: 600; }
-        .tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; background: #e6f7ff; color: #1890ff; }
+        .btn-success { background: #52c41a; }
+        .btn-success:hover { background: #73d13d; }
+        .form-group { margin-bottom: 16px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; }
+        .form-group select { width: 300px; padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; }
+        .editor-container { margin-top: 24px; border: 1px solid #d9d9d9; border-radius: 4px; }
+        .editor-header { background: #fafafa; padding: 12px 16px; border-bottom: 1px solid #d9d9d9; display: flex; justify-content: space-between; align-items: center; }
+        .editor-title { font-weight: 600; color: #333; }
+        textarea { width: 100%; min-height: 500px; padding: 16px; border: none; font-family: 'Courier New', monospace; font-size: 14px; resize: vertical; }
+        .no-project { color: #999; text-align: center; padding: 40px; }
     </style>
 </head>
 <body>
@@ -32,24 +38,122 @@
             <a href="/config" class="menu-item active">配置管理</a>
         </div>
         <div class="content">
-            <button class="btn">添加配置</button>
-            <table>
-                <thead>
-                    <tr>
-                        <th>配置键</th>
-                        <th>配置值</th>
-                        <th>环境</th>
-                        <th>描述</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="5" style="text-align: center; color: #999;">暂无数据</td>
-                    </tr>
-                </tbody>
-            </table>
+            <div class="form-group">
+                <label>选择项目</label>
+                <select id="projectSelect" onchange="loadProjectConfig()">
+                    <option value="">请选择项目</option>
+                </select>
+            </div>
+            
+            <div id="editorContainer" class="editor-container" style="display: none;">
+                <div class="editor-header">
+                    <span class="editor-title" id="fileName"></span>
+                    <div>
+                        <button class="btn btn-success" onclick="saveConfig()">保存配置</button>
+                        <button class="btn" onclick="reloadConfig()">重新加载</button>
+                    </div>
+                </div>
+                <textarea id="configEditor" placeholder="配置内容将在这里显示..."></textarea>
+            </div>
+            
+            <div id="noProject" class="no-project">
+                请选择一个项目以查看和编辑其配置文件
+            </div>
         </div>
     </div>
+
+    <script>
+        let currentProject = null;
+
+        function loadProjects() {
+            fetch('/api/v1/projects')
+                .then(res => res.json())
+                .then(data => {
+                    const select = document.getElementById('projectSelect');
+                    if (data.data && data.data.length > 0) {
+                        data.data.forEach(p => {
+                            const option = document.createElement('option');
+                            option.value = p.name;
+                            option.textContent = p.name;
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => {
+                    console.error('加载项目列表失败:', err);
+                    alert('加载项目列表失败，请刷新页面重试');
+                });
+        }
+
+        function loadProjectConfig() {
+            const projectName = document.getElementById('projectSelect').value;
+            if (!projectName) {
+                document.getElementById('editorContainer').style.display = 'none';
+                document.getElementById('noProject').style.display = 'block';
+                return;
+            }
+
+            currentProject = projectName;
+            document.getElementById('fileName').textContent = projectName + '.json';
+            document.getElementById('noProject').style.display = 'none';
+            document.getElementById('editorContainer').style.display = 'block';
+
+            fetch(`/api/v1/configs/${projectName}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        const editor = document.getElementById('configEditor');
+                        editor.value = JSON.stringify(data.data, null, 2);
+                    } else {
+                        document.getElementById('configEditor').value = '{}';
+                    }
+                })
+                .catch(err => {
+                    console.error('加载配置失败:', err);
+                    document.getElementById('configEditor').value = '{}';
+                });
+        }
+
+        function reloadConfig() {
+            if (currentProject) {
+                loadProjectConfig();
+            }
+        }
+
+        function saveConfig() {
+            if (!currentProject) {
+                alert('请先选择项目');
+                return;
+            }
+
+            const content = document.getElementById('configEditor').value;
+            try {
+                JSON.parse(content);
+            } catch (e) {
+                alert('JSON格式错误，请检查配置内容: ' + e.message);
+                return;
+            }
+
+            fetch(`/api/v1/configs/${currentProject}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content: content })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.code === 200) {
+                    alert('配置保存成功');
+                } else {
+                    alert('保存失败: ' + data.message);
+                }
+            })
+            .catch(err => {
+                console.error('保存配置失败:', err);
+                alert('保存配置失败，请重试');
+            });
+        }
+
+        loadProjects();
+    </script>
 </body>
 </html>

@@ -47,6 +47,7 @@ func main() {
 	releaseService := service.NewReleaseService(mongodb)
 	monitoringService := service.NewMonitoringService()
 	binService := service.NewBinService()
+	configService := service.NewConfigService()
 
 	projectHandler := handler.NewProjectHandler(projectService)
 	releaseHandler := handler.NewReleaseHandler(releaseService, mgr, projectService)
@@ -54,6 +55,7 @@ func main() {
 	binHandler := handler.NewBinHandler(binService)
 	binHandler.SetGitLabMgr(service.NewGitLabMgr(cfg.GitlabConf))
 	binHandler.SetReleaseService(releaseService)
+	configHandler := handler.NewConfigHandler(configService)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)
@@ -79,6 +81,9 @@ func main() {
 
 		api.GET("/monitoring/realtime", monitoringHandler.GetRealtime)
 		api.GET("/monitoring/timeseries", monitoringHandler.GetTimeSeries)
+
+		api.GET("/configs/:name", configHandler.Get)
+		api.PUT("/configs/:name", configHandler.Update)
 
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)
