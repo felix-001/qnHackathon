@@ -6,10 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	cfg "github.com/felix-001/qnHackathon/internal/config"
 	"github.com/google/go-github/v48/github"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/oauth2"
 )
 
@@ -38,7 +37,7 @@ func NewGitHubClient(ctx context.Context, token string) *github.Client {
 
 	client := github.NewClient(tc)
 	if client == nil {
-		log.Logger.Info().Msgf("Failed to create GitHub client")
+		log.Error().Msg("创建 GitHub 客户端失败")
 		return nil
 	}
 	return client
@@ -47,7 +46,7 @@ func NewGitHubClient(ctx context.Context, token string) *github.Client {
 func NewGitHubMgr(conf cfg.GitHubConf) *GitHubMgr {
 	client := NewGitHubClient(context.Background(), conf.GitHubToken)
 	if client == nil {
-		log.Logger.Info().Msgf("Failed to create GitHub client")
+		log.Error().Msg("创建 GitHub 客户端失败")
 		return nil
 	}
 	return &GitHubMgr{
@@ -59,9 +58,9 @@ func (s *GitHubMgr) GetGitHubPullRequest() map[string]*GitMergeRequest {
 	// 获取仓库信息
 	repository, _, err := s.Client.Repositories.Get(context.Background(), s.Conf.Owner, s.Conf.Repo)
 	if err != nil {
-		log.Logger.Info().Msgf("Failed to get repository: %v", err)
+		log.Error().Err(err).Msg("获取仓库信息失败")
 	}
-	log.Printf("Repository URL: %s\n", *repository.URL)
+	log.Info().Str("url", *repository.URL).Msg("仓库 URL")
 
 	// 获取最近的 PR 记录
 	opt := &github.PullRequestListOptions{
@@ -74,7 +73,7 @@ func (s *GitHubMgr) GetGitHubPullRequest() map[string]*GitMergeRequest {
 
 	prs, resp, err := s.Client.PullRequests.List(context.Background(), s.Conf.Owner, s.Conf.Repo, opt)
 	if err != nil {
-		log.Logger.Info().Msgf("Failed to get PRs: %v", err)
+		log.Error().Err(err).Msg("获取 PR 列表失败")
 	}
 	defer resp.Body.Close()
 
@@ -92,7 +91,7 @@ func (s *GitHubMgr) GetGitHubPullRequest() map[string]*GitMergeRequest {
 
 		giraId, changeModules, err := ParseTitle(*pr.Title)
 		if err != nil {
-			log.Logger.Info().Msgf("Failed to parse title: %v", err)
+			log.Warn().Err(err).Str("title", *pr.Title).Msg("解析 PR 标题失败")
 		}
 
 		giraurl := ""

@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
@@ -106,7 +106,7 @@ func (h *BinHandler) GetBin(c *gin.Context) {
 	var streamdData struct {
 		Version string `json:"version"`
 	}
-	log.Printf("streamd.json content: %s\n", file.Content)
+	log.Debug().Str("content", file.Content).Msg("读取 streamd.json 内容")
 	// 先对 file.Content 进行 base64 解码
 	decoded, err := base64.StdEncoding.DecodeString(file.Content)
 	if err != nil {
@@ -114,7 +114,7 @@ func (h *BinHandler) GetBin(c *gin.Context) {
 		return
 	}
 
-	log.Printf("decoded streamd.json content: %s\n", decoded)
+	log.Debug().Str("decoded", string(decoded)).Msg("解析 streamd.json 内容")
 	if err := json.Unmarshal(decoded, &streamdData); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to parse streamd.json: %v", err)})
 		return

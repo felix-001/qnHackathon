@@ -3,35 +3,38 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"log"
 	"os"
 
 	cfg "github.com/felix-001/qnHackathon/internal/config"
 	"github.com/felix-001/qnHackathon/internal/db"
 	"github.com/felix-001/qnHackathon/internal/handler"
 	"github.com/felix-001/qnHackathon/internal/service"
+	"github.com/felix-001/qnHackathon/internal/util"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
+	util.InitLogger()
+	
 	configFile := flag.String("f", "./config/manager.json", "the config file")
 	flag.Parse()
 	cfg := &cfg.Config{}
 	bytes, err := os.ReadFile(*configFile)
 	if err != nil {
-		log.Println("read fail", *configFile, err)
+		log.Error().Err(err).Str("file", *configFile).Msg("读取配置文件失败")
 		return
 	}
 	err = json.Unmarshal(bytes, cfg)
 	if err != nil {
-		log.Println("unmarshal fail", *configFile, err)
+		log.Error().Err(err).Str("file", *configFile).Msg("解析配置文件失败")
 		return
 	}
 
 	mongodb, err := db.NewMongoDB(cfg.MongoConf)
 	if err != nil {
-		log.Println("Failed to connect to MongoDB:", err)
+		log.Error().Err(err).Msg("连接 MongoDB 失败")
 		return
 	}
 	defer mongodb.Close()
@@ -41,6 +44,7 @@ func main() {
 
 	r.Use(cors.Default())
 
+	r.Static("/static", "./web/static")
 	r.LoadHTMLGlob("web/templates/*.html")
 
 	projectService := service.NewProjectService(mongodb)
@@ -117,5 +121,6 @@ func main() {
 
 	r.GET("/health", binHandler.Health)
 
+	log.Info().Str("port", "38012").Msg("服务启动成功")
 	r.Run(":38012")
 }

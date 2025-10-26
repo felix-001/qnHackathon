@@ -1,13 +1,13 @@
 package handler
 
 import (
-	"log"
 	"net/http"
 	"net/url"
 
 	"github.com/felix-001/qnHackathon/internal/model"
 	"github.com/felix-001/qnHackathon/internal/service"
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
 )
 
 type ReleaseHandler struct {
@@ -65,7 +65,7 @@ func (h *ReleaseHandler) Create(c *gin.Context) {
 			if buildInfo.GitlabPRURL != "" {
 				u, err := url.Parse(buildInfo.GitlabPRURL)
 				if err != nil {
-					log.Println("parse GitlabPRURL err:", buildInfo.GitlabPRURL)
+					log.Error().Err(err).Str("url", buildInfo.GitlabPRURL).Msg("解析 GitLab PR URL 失败")
 					return
 				}
 				u.Host = "101.133.131.188:30811"
