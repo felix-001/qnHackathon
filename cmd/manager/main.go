@@ -48,6 +48,7 @@ func main() {
 	monitoringService := service.NewMonitoringService()
 	binService := service.NewBinService()
 	configService := service.NewConfigService(mongodb)
+	grayReleaseService := service.NewGrayReleaseService(mongodb)
 
 	projectHandler := handler.NewProjectHandler(projectService)
 	releaseHandler := handler.NewReleaseHandler(releaseService, mgr, projectService)
@@ -58,6 +59,7 @@ func main() {
 	binHandler.SetReleaseService(releaseService)
 	configHandler := handler.NewConfigHandler(configService)
 	configHandler.SetGitLabMgr(gitlabMgr)
+	grayReleaseHandler := handler.NewGrayReleaseHandler(grayReleaseService)
 	webHandler := handler.NewWebHandler()
 
 	r.GET("/", webHandler.Index)
@@ -92,6 +94,17 @@ func main() {
 		api.GET("/configs/:id/history", configHandler.GetHistory)
 		api.GET("/configs/history", configHandler.GetHistoryByProject)
 		api.GET("/configs/compare", configHandler.Compare)
+		api.GET("/configs/versions", configHandler.GetVersions)
+
+		api.GET("/gray-releases", grayReleaseHandler.List)
+		api.POST("/gray-releases", grayReleaseHandler.Create)
+		api.GET("/gray-releases/:id", grayReleaseHandler.Get)
+		api.PUT("/gray-releases/:id", grayReleaseHandler.Update)
+		api.DELETE("/gray-releases/:id", grayReleaseHandler.Delete)
+		api.GET("/gray-releases/device-stats", grayReleaseHandler.GetDeviceStats)
+		api.POST("/gray-releases/full-release", grayReleaseHandler.FullRelease)
+		api.POST("/gray-releases/device-status", grayReleaseHandler.UpdateDeviceStatus)
+		api.POST("/gray-releases/check-rule", grayReleaseHandler.CheckDeviceGrayRule)
 
 		api.GET("/keepalive", binHandler.GetKeepalive)
 		api.POST("/keepalive", binHandler.PostKeepalive)

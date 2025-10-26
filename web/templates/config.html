@@ -57,6 +57,18 @@
         .compare-toolbar { margin-bottom: 16px; padding: 12px; background: #f0f2f5; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; }
         .compare-info { color: #666; font-size: 12px; }
         .history-checkbox { margin-right: 8px; }
+        .tab-btn { padding: 12px 24px; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 14px; color: #666; }
+        .tab-btn.active { color: #1890ff; border-bottom-color: #1890ff; font-weight: 500; }
+        .tab-btn:hover { color: #1890ff; }
+        .tab-content { margin-top: 16px; }
+        .rule-item { padding: 8px; background: #f5f5f5; border-radius: 4px; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+        .rule-item select { flex: 1; }
+        .rule-item input { flex: 2; }
+        .stats-card { padding: 16px; background: #f9f9f9; border-radius: 8px; margin-bottom: 16px; }
+        .stats-card h4 { margin-bottom: 12px; color: #1890ff; }
+        .stats-row { display: flex; gap: 16px; margin-bottom: 8px; }
+        .stats-label { font-weight: 500; min-width: 100px; }
+        .stats-value { color: #52c41a; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -69,24 +81,31 @@
             <a href="/config" class="menu-item active">配置管理</a>
         </div>
         <div class="content">
-            <div class="toolbar">
-                <button class="btn" onclick="showCreateModal()">新建配置</button>
-                <select id="projectFilter" onchange="loadConfigs()">
-                    <option value="">选择项目</option>
-                </select>
-                <select id="envFilter" onchange="loadConfigs()">
-                    <option value="">全部环境</option>
-                    <option value="dev">开发环境</option>
-                    <option value="test">测试环境</option>
-                    <option value="prod">生产环境</option>
-                </select>
+            <div style="margin-bottom: 16px; border-bottom: 2px solid #f0f0f0;">
+                <button class="tab-btn active" onclick="switchTab('config')">配置管理</button>
+                <button class="tab-btn" onclick="switchTab('gray')">灰度管理</button>
             </div>
+
+            <div id="configTab" class="tab-content">
+                <div class="toolbar">
+                    <button class="btn" onclick="showCreateModal()">新建配置</button>
+                    <select id="projectFilter" onchange="loadConfigs()">
+                        <option value="">选择项目</option>
+                    </select>
+                    <select id="envFilter" onchange="loadConfigs()">
+                        <option value="">全部环境</option>
+                        <option value="dev">开发环境</option>
+                        <option value="test">测试环境</option>
+                        <option value="prod">生产环境</option>
+                    </select>
+                </div>
             <table id="configTable">
                 <thead>
                     <tr>
                         <th>项目名称</th>
                         <th>环境</th>
                         <th>配置文件</th>
+                        <th>版本</th>
                         <th>描述</th>
                         <th>最后更新</th>
                         <th>操作</th>
@@ -94,10 +113,46 @@
                 </thead>
                 <tbody id="configList">
                     <tr>
-                        <td colspan="6" style="text-align: center; color: #999;">加载中...</td>
+                        <td colspan="7" style="text-align: center; color: #999;">加载中...</td>
                     </tr>
                 </tbody>
             </table>
+            </div>
+
+            <div id="grayTab" class="tab-content" style="display: none;">
+                <div class="toolbar">
+                    <button class="btn" onclick="showGrayModal()">新建灰度规则</button>
+                    <select id="grayProjectFilter" onchange="loadGrayReleases()">
+                        <option value="">选择项目</option>
+                    </select>
+                    <select id="grayEnvFilter" onchange="loadGrayReleases()">
+                        <option value="">全部环境</option>
+                        <option value="dev">开发环境</option>
+                        <option value="test">测试环境</option>
+                        <option value="prod">生产环境</option>
+                    </select>
+                    <button class="btn" onclick="loadDeviceStats()" style="background: #52c41a;">查看设备统计</button>
+                </div>
+                <table id="grayTable">
+                    <thead>
+                        <tr>
+                            <th>项目名称</th>
+                            <th>环境</th>
+                            <th>版本</th>
+                            <th>灰度规则</th>
+                            <th>状态</th>
+                            <th>操作人</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="grayList">
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #999;">加载中...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
@@ -168,6 +223,72 @@
         </div>
     </div>
 
+    <div id="grayModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">灰度规则配置</div>
+            <form id="grayForm" onsubmit="return false;">
+                <input type="hidden" id="grayId">
+                <div class="form-group">
+                    <label>项目 <span style="color: red;">*</span></label>
+                    <select id="grayProjectId" required onchange="updateGrayProjectName()"></select>
+                </div>
+                <div class="form-group">
+                    <label>环境 <span style="color: red;">*</span></label>
+                    <select id="grayEnvironment" required onchange="loadVersionsForGray()">
+                        <option value="dev">开发环境</option>
+                        <option value="test">测试环境</option>
+                        <option value="prod">生产环境</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>版本 <span style="color: red;">*</span></label>
+                    <div id="versionCheckboxes" style="padding: 8px; border: 1px solid #d9d9d9; border-radius: 4px; max-height: 200px; overflow-y: auto;">
+                        <div style="color: #999; text-align: center; padding: 20px;">请先选择项目和环境</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>灰度规则 <span style="color: red;">*</span></label>
+                    <div id="rulesContainer"></div>
+                    <button type="button" class="btn" onclick="addRule()" style="margin-top: 8px; font-size: 12px;">添加规则</button>
+                </div>
+                <div class="form-group">
+                    <label>描述</label>
+                    <input type="text" id="grayDescription" placeholder="简要说明灰度目的">
+                </div>
+                <div class="form-group">
+                    <label>操作人 <span style="color: red;">*</span></label>
+                    <input type="text" id="grayOperator" required placeholder="输入操作人姓名">
+                </div>
+                <div class="btn-group">
+                    <button type="button" class="btn" style="background: #d9d9d9; color: #333;" onclick="hideGrayModal()">取消</button>
+                    <button type="button" class="btn" onclick="saveGrayRelease()">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="statsModal" class="modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <div class="modal-header">设备版本统计</div>
+            <div class="toolbar">
+                <select id="statsProjectFilter" onchange="loadDeviceStats()">
+                    <option value="">选择项目</option>
+                </select>
+                <select id="statsEnvFilter" onchange="loadDeviceStats()">
+                    <option value="">选择环境</option>
+                    <option value="dev">开发环境</option>
+                    <option value="test">测试环境</option>
+                    <option value="prod">生产环境</option>
+                </select>
+                <button class="btn" onclick="showFullReleaseConfirm()" style="background: #ff4d4f;">全量发布</button>
+            </div>
+            <div id="statsContent"></div>
+            <div class="btn-group">
+                <button type="button" class="btn" onclick="hideStatsModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let projects = [];
         let configs = [];
@@ -231,14 +352,14 @@
                 }
             } catch (error) {
                 console.error('加载配置失败:', error);
-                document.getElementById('configList').innerHTML = '<tr><td colspan="6" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
+                document.getElementById('configList').innerHTML = '<tr><td colspan="7" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
             }
         }
 
         function renderConfigs() {
             const tbody = document.getElementById('configList');
             if (configs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无配置数据，点击"新建配置"开始创建</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">暂无配置数据，点击"新建配置"开始创建</td></tr>';
                 return;
             }
             
@@ -246,12 +367,14 @@
                 const updateTime = new Date(config.updatedAt).toLocaleString('zh-CN');
                 const envName = getEnvName(config.environment);
                 const fileName = `${config.projectName}.json`;
+                const version = config.version || 1;
                 
                 return `
                     <tr>
                         <td><strong>${config.projectName}</strong></td>
                         <td><span class="tag">${envName}</span></td>
                         <td><code>${fileName}</code></td>
+                        <td><span class="tag" style="background: #e6f7ff; color: #1890ff;">v${version}</span></td>
                         <td>${config.description || '-'}</td>
                         <td>${updateTime}</td>
                         <td>
@@ -588,6 +711,418 @@
 
         function hideCompareModal() {
             document.getElementById('compareModal').classList.remove('active');
+        }
+
+        function switchTab(tab) {
+            const tabs = document.querySelectorAll('.tab-btn');
+            const contents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(t => t.classList.remove('active'));
+            contents.forEach(c => c.style.display = 'none');
+            
+            if (tab === 'config') {
+                tabs[0].classList.add('active');
+                document.getElementById('configTab').style.display = 'block';
+            } else if (tab === 'gray') {
+                tabs[1].classList.add('active');
+                document.getElementById('grayTab').style.display = 'block';
+                loadGrayReleases();
+                updateGrayProjectSelects();
+            }
+        }
+
+        function updateGrayProjectSelects() {
+            const selects = ['grayProjectFilter', 'grayProjectId', 'statsProjectFilter'];
+            selects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                const currentValue = select.value;
+                select.innerHTML = '<option value="">选择项目</option>';
+                projects.forEach(project => {
+                    const selected = project.id === currentValue ? 'selected' : '';
+                    select.innerHTML += `<option value="${project.id}" data-name="${project.name}" ${selected}>${project.name}</option>`;
+                });
+            });
+        }
+
+        function updateGrayProjectName() {
+            const select = document.getElementById('grayProjectId');
+            const selectedOption = select.options[select.selectedIndex];
+            if (selectedOption && selectedOption.dataset.name) {
+                window.currentGrayProjectName = selectedOption.dataset.name;
+            }
+            loadVersionsForGray();
+        }
+
+        async function loadVersionsForGray() {
+            const projectId = document.getElementById('grayProjectId').value;
+            const environment = document.getElementById('grayEnvironment').value;
+            
+            const container = document.getElementById('versionCheckboxes');
+            
+            if (!projectId || !environment) {
+                container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">请先选择项目和环境</div>';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/configs/versions?projectId=${projectId}&environment=${environment}`);
+                const data = await response.json();
+                
+                if (data.code === 200 && data.data && data.data.length > 0) {
+                    const versions = data.data;
+                    container.innerHTML = versions.map(v => `
+                        <div style="padding: 4px 0;">
+                            <label style="cursor: pointer; display: flex; align-items: center;">
+                                <input type="checkbox" name="versionCheck" value="${v}" style="margin-right: 8px;">
+                                <span>v${v}</span>
+                            </label>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div style="color: #999; text-align: center; padding: 20px;">该项目和环境下暂无配置版本</div>';
+                }
+            } catch (error) {
+                console.error('加载版本失败:', error);
+                container.innerHTML = '<div style="color: #f5222d; text-align: center; padding: 20px;">加载失败</div>';
+            }
+        }
+
+        async function loadGrayReleases() {
+            const projectId = document.getElementById('grayProjectFilter').value;
+            const environment = document.getElementById('grayEnvFilter').value;
+            
+            let url = '/api/v1/gray-releases?';
+            if (projectId) url += `projectId=${projectId}&`;
+            if (environment) url += `environment=${environment}`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                if (data.code === 200) {
+                    renderGrayReleases(data.data || []);
+                }
+            } catch (error) {
+                console.error('加载灰度配置失败:', error);
+                document.getElementById('grayList').innerHTML = '<tr><td colspan="8" style="text-align: center; color: #f5222d;">加载失败</td></tr>';
+            }
+        }
+
+        function renderGrayReleases(releases) {
+            const tbody = document.getElementById('grayList');
+            if (releases.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无灰度配置，点击"新建灰度规则"开始创建</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = releases.map(release => {
+                const createTime = new Date(release.createdAt).toLocaleString('zh-CN');
+                const envName = getEnvName(release.environment);
+                const statusName = release.status === 'active' ? '进行中' : '已完成';
+                const statusClass = release.status === 'active' ? '' : 'gray';
+                
+                const rulesText = release.rules.map(rule => {
+                    const dimName = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' }[rule.dimension] || rule.dimension;
+                    return `${dimName}: ${rule.values.join(', ')}`;
+                }).join(' | ');
+                
+                return `
+                    <tr>
+                        <td><strong>${release.projectName}</strong></td>
+                        <td><span class="tag">${envName}</span></td>
+                        <td><span class="tag" style="background: #fff7e6; color: #faad14;">${release.version}</span></td>
+                        <td>${rulesText}</td>
+                        <td><span class="tag ${statusClass}">${statusName}</span></td>
+                        <td>${release.operator}</td>
+                        <td>${createTime}</td>
+                        <td>
+                            <button class="btn action-btn" onclick="editGrayRelease('${release.id}')">编辑</button>
+                            <button class="btn btn-danger action-btn" onclick="deleteGrayRelease('${release.id}')">删除</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        let ruleCounter = 0;
+
+        function showGrayModal() {
+            ruleCounter = 0;
+            document.getElementById('grayForm').reset();
+            document.getElementById('grayId').value = '';
+            document.getElementById('rulesContainer').innerHTML = '';
+            addRule();
+            updateGrayProjectSelects();
+            document.getElementById('grayModal').classList.add('active');
+        }
+
+        function addRule() {
+            const container = document.getElementById('rulesContainer');
+            const ruleId = `rule_${ruleCounter++}`;
+            const ruleHtml = `
+                <div class="rule-item" id="${ruleId}">
+                    <select class="rule-dimension">
+                        <option value="">选择维度</option>
+                        <option value="isp">运营商</option>
+                        <option value="region">大区</option>
+                        <option value="province">省份</option>
+                        <option value="datacenter">机房</option>
+                    </select>
+                    <input type="text" class="rule-values" placeholder="输入值，多个值用逗号分隔，如: 电信,联通">
+                    <button type="button" class="btn btn-danger" onclick="removeRule('${ruleId}')" style="padding: 4px 8px; font-size: 12px;">删除</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', ruleHtml);
+        }
+
+        function removeRule(ruleId) {
+            document.getElementById(ruleId).remove();
+        }
+
+        function getRules() {
+            const rules = [];
+            document.querySelectorAll('.rule-item').forEach(item => {
+                const dimension = item.querySelector('.rule-dimension').value;
+                const valuesStr = item.querySelector('.rule-values').value;
+                if (dimension && valuesStr) {
+                    const values = valuesStr.split(',').map(v => v.trim()).filter(v => v);
+                    if (values.length > 0) {
+                        rules.push({ dimension, values });
+                    }
+                }
+            });
+            return rules;
+        }
+
+        async function saveGrayRelease() {
+            const projectId = document.getElementById('grayProjectId').value;
+            const environment = document.getElementById('grayEnvironment').value;
+            const description = document.getElementById('grayDescription').value;
+            const operator = document.getElementById('grayOperator').value;
+            const rules = getRules();
+
+            const selectedVersions = Array.from(document.querySelectorAll('input[name="versionCheck"]:checked')).map(cb => `v${cb.value}`);
+            if (selectedVersions.length === 0) {
+                alert('请至少选择一个版本');
+                return;
+            }
+            const version = selectedVersions.join(',');
+
+            if (!projectId || !environment || !operator) {
+                alert('请填写所有必填项');
+                return;
+            }
+
+            if (rules.length === 0) {
+                alert('请至少添加一条灰度规则');
+                return;
+            }
+
+            const projectName = window.currentGrayProjectName || document.getElementById('grayProjectId').options[document.getElementById('grayProjectId').selectedIndex].dataset.name;
+
+            const grayRelease = {
+                projectId,
+                projectName,
+                environment,
+                version,
+                rules,
+                description,
+                operator
+            };
+
+            try {
+                const grayId = document.getElementById('grayId').value;
+                let response;
+                if (grayId) {
+                    response = await fetch(`/api/v1/gray-releases/${grayId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(grayRelease)
+                    });
+                } else {
+                    response = await fetch('/api/v1/gray-releases', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(grayRelease)
+                    });
+                }
+
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('保存成功');
+                    hideGrayModal();
+                    loadGrayReleases();
+                } else {
+                    alert('保存失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('保存灰度配置失败:', error);
+                alert('保存失败: ' + error.message);
+            }
+        }
+
+        async function editGrayRelease(id) {
+            try {
+                const response = await fetch(`/api/v1/gray-releases/${id}`);
+                const data = await response.json();
+                if (data.code === 200) {
+                    const release = data.data;
+                    document.getElementById('grayId').value = id;
+                    document.getElementById('grayProjectId').value = release.projectId;
+                    window.currentGrayProjectName = release.projectName;
+                    document.getElementById('grayEnvironment').value = release.environment;
+                    document.getElementById('grayDescription').value = release.description || '';
+                    
+                    await loadVersionsForGray();
+                    
+                    const selectedVersions = release.version.split(',').map(v => v.replace('v', ''));
+                    selectedVersions.forEach(v => {
+                        const checkbox = document.querySelector(`input[name="versionCheck"][value="${v}"]`);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                    
+                    const container = document.getElementById('rulesContainer');
+                    container.innerHTML = '';
+                    ruleCounter = 0;
+                    
+                    release.rules.forEach(rule => {
+                        addRule();
+                        const lastRule = container.lastElementChild;
+                        lastRule.querySelector('.rule-dimension').value = rule.dimension;
+                        lastRule.querySelector('.rule-values').value = rule.values.join(', ');
+                    });
+                    
+                    document.getElementById('grayModal').classList.add('active');
+                }
+            } catch (error) {
+                console.error('加载灰度配置失败:', error);
+                alert('加载失败');
+            }
+        }
+
+        async function deleteGrayRelease(id) {
+            if (!confirm('确定要删除这个灰度配置吗？')) return;
+            
+            try {
+                const response = await fetch(`/api/v1/gray-releases/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('删除成功');
+                    loadGrayReleases();
+                } else {
+                    alert('删除失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('删除灰度配置失败:', error);
+                alert('删除失败');
+            }
+        }
+
+        function hideGrayModal() {
+            document.getElementById('grayModal').classList.remove('active');
+        }
+
+        async function loadDeviceStats() {
+            updateGrayProjectSelects();
+            const projectId = document.getElementById('statsProjectFilter')?.value || document.getElementById('grayProjectFilter')?.value;
+            const environment = document.getElementById('statsEnvFilter')?.value || document.getElementById('grayEnvFilter')?.value;
+            
+            if (!projectId || !environment) {
+                alert('请先选择项目和环境');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/gray-releases/device-stats?projectId=${projectId}&environment=${environment}`);
+                const data = await response.json();
+                if (data.code === 200) {
+                    renderDeviceStats(data.data || []);
+                    document.getElementById('statsModal').classList.add('active');
+                } else {
+                    alert('加载统计失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('加载设备统计失败:', error);
+                alert('加载失败');
+            }
+        }
+
+        function renderDeviceStats(stats) {
+            const container = document.getElementById('statsContent');
+            if (stats.length === 0) {
+                container.innerHTML = '<div class="empty-state">暂无设备数据</div>';
+                return;
+            }
+
+            container.innerHTML = stats.map(stat => {
+                const dimensions = Object.entries(stat.byDimension || {})
+                    .map(([key, value]) => {
+                        const parts = key.split('_');
+                        const dimType = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' }[parts[0]] || parts[0];
+                        const dimValue = parts.slice(1).join('_');
+                        return `<div class="stats-row"><span class="stats-label">${dimType} - ${dimValue}:</span><span class="stats-value">${value} 台</span></div>`;
+                    }).join('');
+
+                return `
+                    <div class="stats-card">
+                        <h4>版本: ${stat.version}</h4>
+                        <div class="stats-row">
+                            <span class="stats-label">设备总数:</span>
+                            <span class="stats-value">${stat.deviceCount} 台</span>
+                        </div>
+                        ${dimensions}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function showFullReleaseConfirm() {
+            const projectId = document.getElementById('statsProjectFilter').value;
+            const environment = document.getElementById('statsEnvFilter').value;
+            
+            if (!projectId || !environment) {
+                alert('请先选择项目和环境');
+                return;
+            }
+
+            const version = prompt('请输入要全量发布的版本号:');
+            if (!version) return;
+
+            const operator = prompt('请输入操作人:');
+            if (!operator) return;
+
+            if (!confirm(`确定要将所有设备更新到版本 ${version} 吗？`)) return;
+
+            fullRelease(projectId, environment, version, operator);
+        }
+
+        async function fullRelease(projectId, environment, version, operator) {
+            try {
+                const response = await fetch('/api/v1/gray-releases/full-release', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ projectId, environment, version, operator })
+                });
+
+                const data = await response.json();
+                if (data.code === 200) {
+                    alert('全量发布成功');
+                    loadDeviceStats();
+                    loadGrayReleases();
+                } else {
+                    alert('全量发布失败: ' + data.message);
+                }
+            } catch (error) {
+                console.error('全量发布失败:', error);
+                alert('全量发布失败');
+            }
+        }
+
+        function hideStatsModal() {
+            document.getElementById('statsModal').classList.remove('active');
         }
 
         init();

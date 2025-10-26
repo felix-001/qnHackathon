@@ -103,6 +103,7 @@ type Config struct {
 	FileName    string    `json:"fileName" bson:"fileName"`
 	Content     string    `json:"content" bson:"content"`
 	Description string    `json:"description" bson:"description"`
+	Version     int       `json:"version" bson:"version"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
 }
@@ -121,4 +122,46 @@ type ConfigHistory struct {
 	Operator    string    `json:"operator" bson:"operator"`
 	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
+}
+
+type GrayReleaseRule struct {
+	Dimension string   `json:"dimension" bson:"dimension"`
+	Values    []string `json:"values" bson:"values"`
+}
+
+type GrayReleaseConfig struct {
+	ID          string             `json:"id" bson:"_id,omitempty"`
+	ConfigID    string             `json:"configId" bson:"configId"`
+	ProjectID   string             `json:"projectId" bson:"projectId"`
+	ProjectName string             `json:"projectName" bson:"projectName"`
+	Environment string             `json:"environment" bson:"environment"`
+	Version     string             `json:"version" bson:"version"`
+	Rules       []GrayReleaseRule  `json:"rules" bson:"rules"`
+	Status      string             `json:"status" bson:"status"`
+	Operator    string             `json:"operator" bson:"operator"`
+	Description string             `json:"description" bson:"description"`
+	CreatedAt   time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt   time.Time          `json:"updatedAt" bson:"updatedAt"`
+}
+
+type DeviceGrayStatus struct {
+	ID           string    `json:"id" bson:"_id,omitempty"`
+	NodeID       string    `json:"nodeId" bson:"nodeId"`
+	NodeName     string    `json:"nodeName" bson:"nodeName"`
+	ProjectID    string    `json:"projectId" bson:"projectId"`
+	ProjectName  string    `json:"projectName" bson:"projectName"`
+	Environment  string    `json:"environment" bson:"environment"`
+	CurrentVersion string  `json:"currentVersion" bson:"currentVersion"`
+	ISP          string    `json:"isp" bson:"isp"`
+	Region       string    `json:"region" bson:"region"`
+	Province     string    `json:"province" bson:"province"`
+	DataCenter   string    `json:"dataCenter" bson:"dataCenter"`
+	Status       string    `json:"status" bson:"status"`
+	UpdatedAt    time.Time `json:"updatedAt" bson:"updatedAt"`
+}
+
+type GrayReleaseStats struct {
+	Version      string            `json:"version"`
+	DeviceCount  int               `json:"deviceCount"`
+	ByDimension  map[string]int    `json:"byDimension"`
 }
