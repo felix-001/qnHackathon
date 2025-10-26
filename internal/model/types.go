@@ -103,7 +103,7 @@ type Config struct {
 	FileName    string    `json:"fileName" bson:"fileName"`
 	Content     string    `json:"content" bson:"content"`
 	Description string    `json:"description" bson:"description"`
-	Version     int       `json:"version" bson:"version"`
+	Version     string    `json:"version" bson:"version"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 	UpdatedAt   time.Time `json:"updatedAt" bson:"updatedAt"`
 }
@@ -121,6 +121,7 @@ type ConfigHistory struct {
 	Reason      string    `json:"reason" bson:"reason"`
 	Operator    string    `json:"operator" bson:"operator"`
 	GitLabMR    string    `json:"gitlabMR,omitempty" bson:"gitlabMR,omitempty"`
+	Version     string    `json:"version" bson:"version"`
 	CreatedAt   time.Time `json:"createdAt" bson:"createdAt"`
 }
 
