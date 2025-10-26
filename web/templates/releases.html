@@ -95,6 +95,36 @@
         </div>
     </div>
 
+    <div id="grayModal" class="modal">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2>灰度发布配置</h2>
+            <div class="form-group">
+                <label>版本信息</label>
+                <div id="grayVersionInfo" style="padding: 8px; background: #f5f5f5; border-radius: 4px; color: #666;"></div>
+            </div>
+            <div class="form-group">
+                <label>组合逻辑</label>
+                <select id="grayRuleLogic">
+                    <option value="AND">AND (所有策略都匹配)</option>
+                    <option value="OR">OR (任一策略匹配)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>灰度策略</label>
+                <div id="grayStrategiesContainer"></div>
+                <button type="button" class="btn" onclick="addGrayStrategy()" style="margin-top: 8px;">添加策略</button>
+            </div>
+            <div class="form-group">
+                <label>描述</label>
+                <textarea id="grayDescription" placeholder="简要说明灰度目的"></textarea>
+            </div>
+            <div class="btn-group">
+                <button type="button" class="btn" style="background: #d9d9d9; color: #333;" onclick="hideGrayModal()">取消</button>
+                <button type="button" class="btn" onclick="saveGrayConfig()">确定</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let currentReleases = [];
         let editingReleaseId = null;
@@ -388,31 +418,186 @@
             }
         }
 
+        let currentGrayRelease = null;
+        let grayStrategyCounter = 0;
+
         function grayRelease(id) {
             const release = currentReleases.find(r => r.id === id);
             if (!release) return;
             
-            const percentage = prompt('请输入灰度发布百分比 (1-100):', '10');
-            if (percentage === null) return;
+            currentGrayRelease = release;
+            document.getElementById('grayVersionInfo').textContent = `项目: ${release.projectName || release.projectId} | 版本: ${release.version} | 环境: ${release.environment}`;
+            document.getElementById('grayRuleLogic').value = 'AND';
+            document.getElementById('grayDescription').value = '';
+            document.getElementById('grayStrategiesContainer').innerHTML = '';
+            grayStrategyCounter = 0;
             
-            const pct = parseInt(percentage);
-            if (isNaN(pct) || pct < 1 || pct > 100) {
-                alert('❌ 请输入有效的百分比 (1-100)');
+            addGrayStrategy();
+            document.getElementById('grayModal').classList.add('active');
+        }
+
+        function hideGrayModal() {
+            document.getElementById('grayModal').classList.remove('active');
+            currentGrayRelease = null;
+        }
+
+        function addGrayStrategy() {
+            const strategyId = 'strategy-' + (++grayStrategyCounter);
+            const container = document.getElementById('grayStrategiesContainer');
+            
+            const strategyHtml = `
+                <div id="${strategyId}" class="strategy-item" style="border: 1px solid #d9d9d9; padding: 12px; margin-bottom: 8px; border-radius: 4px; background: #fafafa;">
+                    <div style="display: flex; gap: 8px; align-items: flex-start;">
+                        <div style="flex: 1;">
+                            <select class="strategy-type" onchange="updateStrategyFields('${strategyId}')" style="width: 100%; padding: 6px; margin-bottom: 8px;">
+                                <option value="">选择策略类型</option>
+                                <option value="percentage">百分比灰度</option>
+                                <option value="hash">哈希灰度</option>
+                                <option value="whitelist">白名单</option>
+                                <option value="blacklist">黑名单</option>
+                                <option value="dimension">维度匹配</option>
+                                <option value="time_window">时间窗口</option>
+                            </select>
+                            <div class="strategy-fields"></div>
+                        </div>
+                        <button type="button" class="btn btn-danger" onclick="removeGrayStrategy('${strategyId}')" style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">删除</button>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', strategyHtml);
+        }
+
+        function removeGrayStrategy(strategyId) {
+            document.getElementById(strategyId).remove();
+        }
+
+        function updateStrategyFields(strategyId) {
+            const strategyItem = document.getElementById(strategyId);
+            const type = strategyItem.querySelector('.strategy-type').value;
+            const fieldsContainer = strategyItem.querySelector('.strategy-fields');
+            
+            let fieldsHtml = '';
+            switch(type) {
+                case 'percentage':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">百分比 (1-100)</label>
+                        <input type="number" class="field-percentage" min="1" max="100" placeholder="10" style="width: 100%; padding: 6px;">
+                    `;
+                    break;
+                case 'hash':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">哈希字段</label>
+                        <select class="field-hashField" style="width: 100%; padding: 6px;">
+                            <option value="nodeId">节点ID</option>
+                            <option value="nodeName">节点名称</option>
+                        </select>
+                    `;
+                    break;
+                case 'whitelist':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">节点列表 (逗号分隔)</label>
+                        <textarea class="field-values" placeholder="node-001, node-002, node-003" style="width: 100%; padding: 6px; min-height: 60px;"></textarea>
+                    `;
+                    break;
+                case 'blacklist':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">排除节点列表 (逗号分隔)</label>
+                        <textarea class="field-values" placeholder="node-001, node-002" style="width: 100%; padding: 6px; min-height: 60px;"></textarea>
+                    `;
+                    break;
+                case 'dimension':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">维度类型</label>
+                        <select class="field-dimension" style="width: 100%; padding: 6px; margin-bottom: 8px;">
+                            <option value="isp">运营商 (ISP)</option>
+                            <option value="region">大区 (Region)</option>
+                            <option value="province">省份 (Province)</option>
+                            <option value="datacenter">机房 (DataCenter)</option>
+                        </select>
+                        <label style="font-size: 12px; color: #666;">值列表 (逗号分隔)</label>
+                        <input type="text" class="field-values" placeholder="beijing, shanghai" style="width: 100%; padding: 6px;">
+                    `;
+                    break;
+                case 'time_window':
+                    fieldsHtml = `
+                        <label style="font-size: 12px; color: #666;">开始时间</label>
+                        <input type="datetime-local" class="field-startTime" style="width: 100%; padding: 6px; margin-bottom: 8px;">
+                        <label style="font-size: 12px; color: #666;">结束时间</label>
+                        <input type="datetime-local" class="field-endTime" style="width: 100%; padding: 6px;">
+                    `;
+                    break;
+            }
+            fieldsContainer.innerHTML = fieldsHtml;
+        }
+
+        function getGrayStrategies() {
+            const strategies = [];
+            document.querySelectorAll('.strategy-item').forEach(item => {
+                const type = item.querySelector('.strategy-type').value;
+                if (!type) return;
+                
+                const strategy = { type };
+                
+                switch(type) {
+                    case 'percentage':
+                        const pct = parseInt(item.querySelector('.field-percentage').value);
+                        if (isNaN(pct) || pct < 1 || pct > 100) return;
+                        strategy.percentage = pct;
+                        break;
+                    case 'hash':
+                        strategy.hashField = item.querySelector('.field-hashField').value;
+                        break;
+                    case 'whitelist':
+                    case 'blacklist':
+                        const values = item.querySelector('.field-values').value;
+                        if (!values.trim()) return;
+                        strategy.values = values.split(',').map(v => v.trim()).filter(v => v);
+                        break;
+                    case 'dimension':
+                        const dimension = item.querySelector('.field-dimension').value;
+                        const dimValues = item.querySelector('.field-values').value;
+                        if (!dimension || !dimValues.trim()) return;
+                        strategy.dimension = dimension;
+                        strategy.values = dimValues.split(',').map(v => v.trim()).filter(v => v);
+                        break;
+                    case 'time_window':
+                        const startTime = item.querySelector('.field-startTime').value;
+                        const endTime = item.querySelector('.field-endTime').value;
+                        if (!startTime || !endTime) return;
+                        strategy.startTime = new Date(startTime).toISOString();
+                        strategy.endTime = new Date(endTime).toISOString();
+                        break;
+                }
+                
+                strategies.push(strategy);
+            });
+            return strategies;
+        }
+
+        function saveGrayConfig() {
+            if (!currentGrayRelease) return;
+            
+            const strategies = getGrayStrategies();
+            if (strategies.length === 0) {
+                alert('❌ 请至少配置一个有效的灰度策略');
                 return;
             }
             
+            const ruleLogic = document.getElementById('grayRuleLogic').value;
+            const description = document.getElementById('grayDescription').value;
+            
             const config = {
-                releaseId: id,
-                projectId: release.projectId,
-                environment: release.environment,
-                version: release.version,
-                name: `${release.version} 灰度发布`,
-                rules: [
-                    {
-                        type: 'percentage',
-                        value: pct
-                    }
-                ],
+                releaseId: currentGrayRelease.id,
+                projectId: currentGrayRelease.projectId,
+                projectName: currentGrayRelease.projectName,
+                environment: currentGrayRelease.environment,
+                version: currentGrayRelease.version,
+                name: `${currentGrayRelease.version} 灰度发布`,
+                strategyType: 'advanced',
+                ruleLogic: ruleLogic,
+                strategies: strategies,
+                description: description || '灰度发布',
+                operator: 'admin',
                 autoPromote: false,
                 status: 'active',
                 createdAt: new Date().toISOString()
@@ -426,7 +611,8 @@
             .then(res => res.json())
             .then(data => {
                 if (data.code === 200 || data.code === 0) {
-                    alert(`✅ 灰度发布配置创建成功 (${pct}% 设备)`);
+                    alert(`✅ 灰度发布配置创建成功`);
+                    hideGrayModal();
                     loadReleases();
                 } else {
                     alert('❌ 灰度发布配置创建失败: ' + (data.message || '未知错误'));
