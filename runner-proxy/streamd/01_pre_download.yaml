@@ -1,0 +1,55 @@
+---
+- name: 下载并解压 bin 二进制
+  hosts: all
+  become: yes # 提权操作
+  vars:
+    # 可配置参数 - 根据实际需求修改
+    bin_name: "streamd" # 组件|服务名称
+    bin_tar: "{{ bin_name }}.tar.gz" # 软件包名称
+    bin_tar_url: "http://101.133.131.188:38010/job/streamd/lastSuccessfulBuild/artifact/streamd-20251026-040135.tar.gz" # 下载URL
+    download_dir: "/tmp/download" # 下载保存目录
+    bin_tar_dest: "{{ download_dir }}/{{ bin_tar }}" # 本地保存路径
+    # 解压
+    bin_extract_dir: "/tmp/extract"
+    bin_extract_full_path: "{{ bin_extract_dir }}/{{ bin_name }}" # 二进制文件路径， 待部署是覆盖到服务真正运行的目录
+
+  tasks:
+    - name: 确保下载目录存在
+      ansible.builtin.file:
+        path: "{{ download_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: 确保解压目录存在
+      ansible.builtin.file:
+        path: "{{ bin_extract_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: 下载 bin tarball 文件
+      ansible.builtin.get_url:
+        url: "{{ bin_tar_url }}"
+        dest: "{{ bin_tar_dest }}"
+        mode: "0644"
+        validate_certs: no # 验证 SSL 证书，如需关闭设为 no
+      register: bin_download_result
+      retries: 3
+      delay: 5
+      until: bin_download_result is succeeded
+
+    - name: 验证文件哈希值
+      ansible.builtin.stat:
+        path: "{{ bin_tar_dest }}"
+        checksum_algorithm: sha256
+        get_checksum: yes
+      register: file_checksum
+      failed_when: file_checksum.stat.checksum != "4c0f035626e0ba151d13b02a472249d6953cf9eb52925701dea308cb0663f1d3"
+      when: bin_download_result is changed # 仅当下载成功时验证
+
+    - name: 解压 tarball 到目标目录
+      ansible.builtin.unarchive:
+        src: "{{ bin_tar_dest }}"
+        dest: "{{ bin_extract_dir }}"
+        remote_src: yes # 源文件在远程节点上
+        mode: "0755"
+      when: bin_download_result is changed # 仅当下载成功时解压
