@@ -9,6 +9,7 @@ require (
 	github.com/google/go-github/v48 v48.2.0
 	github.com/rs/zerolog v1.34.0
 	gitlab.com/gitlab-org/api/client-go v0.157.0
+	go.mongodb.org/mongo-driver v1.17.4
 	golang.org/x/oauth2 v0.32.0
 )
 
@@ -43,7 +44,6 @@ require (
 	github.com/xdg-go/scram v1.1.2 // indirect
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
-	go.mongodb.org/mongo-driver v1.17.4 // indirect
 	golang.org/x/arch v0.5.0 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
