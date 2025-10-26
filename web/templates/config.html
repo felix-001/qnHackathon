@@ -107,6 +107,7 @@
                             <th>项目名称</th>
                             <th>环境</th>
                             <th>版本</th>
+                            <th>策略类型</th>
                             <th>灰度规则</th>
                             <th>状态</th>
                             <th>操作人</th>
@@ -215,9 +216,28 @@
                     </div>
                 </div>
                 <div class="form-group">
+                    <label>策略类型 <span style="color: red;">*</span></label>
+                    <select id="strategyType" onchange="updateStrategyForm()">
+                        <option value="simple">简单规则（维度匹配）</option>
+                        <option value="advanced">高级策略</option>
+                    </select>
+                </div>
+                <div class="form-group" id="simpleRulesGroup">
                     <label>灰度规则 <span style="color: red;">*</span></label>
                     <div id="rulesContainer"></div>
-                    <button type="button" class="btn" onclick="addRule()" style="margin-top: 8px; font-size: 12px;">添加规则</button>
+                    <button type="button" class="btn" onclick="addRule()" style="margin-top: 8px; font-size: 12px;">添加维度规则</button>
+                </div>
+                <div class="form-group" id="advancedStrategiesGroup" style="display: none;">
+                    <label>灰度策略 <span style="color: red;">*</span></label>
+                    <div id="strategiesContainer"></div>
+                    <button type="button" class="btn" onclick="addStrategy()" style="margin-top: 8px; font-size: 12px;">添加策略</button>
+                </div>
+                <div class="form-group" id="ruleLogicGroup" style="display: none;">
+                    <label>组合逻辑</label>
+                    <select id="ruleLogic">
+                        <option value="AND">AND（所有策略都匹配）</option>
+                        <option value="OR">OR（任一策略匹配）</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>描述</label>
@@ -790,7 +810,7 @@
         function renderGrayReleases(releases) {
             const tbody = document.getElementById('grayList');
             if (releases.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" class="empty-state">暂无灰度配置，点击"新建灰度规则"开始创建</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" class="empty-state">暂无灰度配置，点击"新建灰度规则"开始创建</td></tr>';
                 return;
             }
             
@@ -800,16 +820,52 @@
                 const statusName = release.status === 'active' ? '进行中' : '已完成';
                 const statusClass = release.status === 'active' ? '' : 'gray';
                 
-                const rulesText = release.rules.map(rule => {
-                    const dimName = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' }[rule.dimension] || rule.dimension;
-                    return `${dimName}: ${rule.values.join(', ')}`;
-                }).join(' | ');
+                let strategyTypeText = '简单规则';
+                let rulesText = '';
+                
+                if (release.strategyType === 'advanced' && release.strategies && release.strategies.length > 0) {
+                    strategyTypeText = '高级策略';
+                    rulesText = release.strategies.map(strategy => {
+                        const typeMap = {
+                            'percentage': '百分比',
+                            'hash': '哈希',
+                            'whitelist': '白名单',
+                            'blacklist': '黑名单',
+                            'dimension': '维度',
+                            'time_window': '时间窗口'
+                        };
+                        const typeName = typeMap[strategy.type] || strategy.type;
+                        
+                        if (strategy.type === 'percentage') {
+                            return `${typeName}: ${strategy.percentage}%`;
+                        } else if (strategy.type === 'hash') {
+                            return `${typeName}: ${strategy.hashKey}`;
+                        } else if (strategy.type === 'dimension') {
+                            const dimName = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' }[strategy.dimension] || strategy.dimension;
+                            return `${dimName}: ${strategy.values.join(', ')}`;
+                        } else if (strategy.type === 'whitelist' || strategy.type === 'blacklist') {
+                            return `${typeName}: ${strategy.values.join(', ')}`;
+                        } else if (strategy.type === 'time_window') {
+                            return `${typeName}`;
+                        }
+                        return typeName;
+                    }).join(' | ');
+                    if (release.ruleLogic) {
+                        rulesText = `[${release.ruleLogic}] ` + rulesText;
+                    }
+                } else if (release.rules && release.rules.length > 0) {
+                    rulesText = release.rules.map(rule => {
+                        const dimName = { isp: '运营商', region: '大区', province: '省份', datacenter: '机房' }[rule.dimension] || rule.dimension;
+                        return `${dimName}: ${rule.values.join(', ')}`;
+                    }).join(' | ');
+                }
                 
                 return `
                     <tr>
                         <td><strong>${release.projectName}</strong></td>
                         <td><span class="tag">${envName}</span></td>
                         <td><span class="tag" style="background: #fff7e6; color: #faad14;">${release.version}</span></td>
+                        <td><span class="tag" style="background: #f0f5ff; color: #1890ff;">${strategyTypeText}</span></td>
                         <td>${rulesText}</td>
                         <td><span class="tag ${statusClass}">${statusName}</span></td>
                         <td>${release.operator}</td>
@@ -824,15 +880,37 @@
         }
 
         let ruleCounter = 0;
+        let strategyCounter = 0;
 
         function showGrayModal() {
             ruleCounter = 0;
+            strategyCounter = 0;
             document.getElementById('grayForm').reset();
             document.getElementById('grayId').value = '';
+            document.getElementById('strategyType').value = 'simple';
             document.getElementById('rulesContainer').innerHTML = '';
+            document.getElementById('strategiesContainer').innerHTML = '';
+            updateStrategyForm();
             addRule();
             updateGrayProjectSelects();
             document.getElementById('grayModal').classList.add('active');
+        }
+
+        function updateStrategyForm() {
+            const strategyType = document.getElementById('strategyType').value;
+            const simpleGroup = document.getElementById('simpleRulesGroup');
+            const advancedGroup = document.getElementById('advancedStrategiesGroup');
+            const logicGroup = document.getElementById('ruleLogicGroup');
+            
+            if (strategyType === 'advanced') {
+                simpleGroup.style.display = 'none';
+                advancedGroup.style.display = 'block';
+                logicGroup.style.display = 'block';
+            } else {
+                simpleGroup.style.display = 'block';
+                advancedGroup.style.display = 'none';
+                logicGroup.style.display = 'none';
+            }
         }
 
         function addRule() {
@@ -858,9 +936,65 @@
             document.getElementById(ruleId).remove();
         }
 
+        function addStrategy() {
+            const container = document.getElementById('strategiesContainer');
+            const strategyId = `strategy_${strategyCounter++}`;
+            const strategyHtml = `
+                <div class="rule-item" id="${strategyId}">
+                    <select class="strategy-type" onchange="updateStrategyFields('${strategyId}')">
+                        <option value="">选择策略类型</option>
+                        <option value="percentage">百分比灰度</option>
+                        <option value="hash">哈希灰度</option>
+                        <option value="whitelist">白名单</option>
+                        <option value="blacklist">黑名单</option>
+                        <option value="dimension">维度匹配</option>
+                    </select>
+                    <div class="strategy-fields" style="flex: 2; display: flex; gap: 10px;"></div>
+                    <button type="button" class="btn btn-danger" onclick="removeStrategy('${strategyId}')" style="padding: 4px 8px; font-size: 12px;">删除</button>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', strategyHtml);
+        }
+
+        function removeStrategy(strategyId) {
+            document.getElementById(strategyId).remove();
+        }
+
+        function updateStrategyFields(strategyId) {
+            const item = document.getElementById(strategyId);
+            const type = item.querySelector('.strategy-type').value;
+            const fieldsContainer = item.querySelector('.strategy-fields');
+            
+            if (type === 'percentage') {
+                fieldsContainer.innerHTML = '<input type="number" class="strategy-value" placeholder="百分比 (1-100)" min="1" max="100" style="flex: 1;">';
+            } else if (type === 'hash') {
+                fieldsContainer.innerHTML = `
+                    <select class="strategy-value" style="flex: 1;">
+                        <option value="nodeId">基于节点ID</option>
+                        <option value="nodeName">基于节点名称</option>
+                    </select>
+                `;
+            } else if (type === 'whitelist' || type === 'blacklist') {
+                fieldsContainer.innerHTML = '<input type="text" class="strategy-value" placeholder="节点ID列表，逗号分隔" style="flex: 1;">';
+            } else if (type === 'dimension') {
+                fieldsContainer.innerHTML = `
+                    <select class="strategy-dimension" style="flex: 1;">
+                        <option value="">选择维度</option>
+                        <option value="isp">运营商</option>
+                        <option value="region">大区</option>
+                        <option value="province">省份</option>
+                        <option value="datacenter">机房</option>
+                    </select>
+                    <input type="text" class="strategy-value" placeholder="输入值，逗号分隔" style="flex: 1;">
+                `;
+            } else {
+                fieldsContainer.innerHTML = '';
+            }
+        }
+
         function getRules() {
             const rules = [];
-            document.querySelectorAll('.rule-item').forEach(item => {
+            document.querySelectorAll('#rulesContainer .rule-item').forEach(item => {
                 const dimension = item.querySelector('.rule-dimension').value;
                 const valuesStr = item.querySelector('.rule-values').value;
                 if (dimension && valuesStr) {
@@ -873,12 +1007,57 @@
             return rules;
         }
 
+        function getStrategies() {
+            const strategies = [];
+            document.querySelectorAll('#strategiesContainer .rule-item').forEach(item => {
+                const type = item.querySelector('.strategy-type').value;
+                if (!type) return;
+                
+                const strategy = { type };
+                
+                if (type === 'percentage') {
+                    const percentage = parseInt(item.querySelector('.strategy-value').value);
+                    if (percentage && percentage >= 1 && percentage <= 100) {
+                        strategy.percentage = percentage;
+                        strategies.push(strategy);
+                    }
+                } else if (type === 'hash') {
+                    const hashKey = item.querySelector('.strategy-value').value;
+                    if (hashKey) {
+                        strategy.hashKey = hashKey;
+                        strategies.push(strategy);
+                    }
+                } else if (type === 'whitelist' || type === 'blacklist') {
+                    const valuesStr = item.querySelector('.strategy-value').value;
+                    if (valuesStr) {
+                        const values = valuesStr.split(',').map(v => v.trim()).filter(v => v);
+                        if (values.length > 0) {
+                            strategy.values = values;
+                            strategies.push(strategy);
+                        }
+                    }
+                } else if (type === 'dimension') {
+                    const dimension = item.querySelector('.strategy-dimension').value;
+                    const valuesStr = item.querySelector('.strategy-value').value;
+                    if (dimension && valuesStr) {
+                        const values = valuesStr.split(',').map(v => v.trim()).filter(v => v);
+                        if (values.length > 0) {
+                            strategy.dimension = dimension;
+                            strategy.values = values;
+                            strategies.push(strategy);
+                        }
+                    }
+                }
+            });
+            return strategies;
+        }
+
         async function saveGrayRelease() {
             const projectId = document.getElementById('grayProjectId').value;
             const environment = document.getElementById('grayEnvironment').value;
             const description = document.getElementById('grayDescription').value;
             const operator = document.getElementById('grayOperator').value;
-            const rules = getRules();
+            const strategyType = document.getElementById('strategyType').value;
 
             const selectedVersions = Array.from(document.querySelectorAll('input[name="versionCheck"]:checked')).map(cb => cb.value);
             if (selectedVersions.length === 0) {
@@ -892,11 +1071,6 @@
                 return;
             }
 
-            if (rules.length === 0) {
-                alert('请至少添加一条灰度规则');
-                return;
-            }
-
             const projectName = window.currentGrayProjectName || document.getElementById('grayProjectId').options[document.getElementById('grayProjectId').selectedIndex].dataset.name;
 
             const grayRelease = {
@@ -904,10 +1078,32 @@
                 projectName,
                 environment,
                 version,
-                rules,
                 description,
                 operator
             };
+
+            if (strategyType === 'advanced') {
+                const strategies = getStrategies();
+                const ruleLogic = document.getElementById('ruleLogic').value;
+                
+                if (strategies.length === 0) {
+                    alert('请至少添加一条灰度策略');
+                    return;
+                }
+                
+                grayRelease.strategyType = 'advanced';
+                grayRelease.strategies = strategies;
+                grayRelease.ruleLogic = ruleLogic;
+            } else {
+                const rules = getRules();
+                
+                if (rules.length === 0) {
+                    alert('请至少添加一条灰度规则');
+                    return;
+                }
+                
+                grayRelease.rules = rules;
+            }
 
             try {
                 const grayId = document.getElementById('grayId').value;
@@ -960,16 +1156,51 @@
                         if (checkbox) checkbox.checked = true;
                     });
                     
-                    const container = document.getElementById('rulesContainer');
-                    container.innerHTML = '';
-                    ruleCounter = 0;
-                    
-                    release.rules.forEach(rule => {
-                        addRule();
-                        const lastRule = container.lastElementChild;
-                        lastRule.querySelector('.rule-dimension').value = rule.dimension;
-                        lastRule.querySelector('.rule-values').value = rule.values.join(', ');
-                    });
+                    if (release.strategyType === 'advanced' && release.strategies && release.strategies.length > 0) {
+                        document.getElementById('strategyType').value = 'advanced';
+                        document.getElementById('ruleLogic').value = release.ruleLogic || 'AND';
+                        updateStrategyForm();
+                        
+                        const strategiesContainer = document.getElementById('strategiesContainer');
+                        strategiesContainer.innerHTML = '';
+                        strategyCounter = 0;
+                        
+                        release.strategies.forEach(strategy => {
+                            addStrategy();
+                            const lastStrategy = strategiesContainer.lastElementChild;
+                            lastStrategy.querySelector('.strategy-type').value = strategy.type;
+                            updateStrategyFields(lastStrategy.id);
+                            
+                            if (strategy.type === 'percentage') {
+                                lastStrategy.querySelector('.strategy-value').value = strategy.percentage;
+                            } else if (strategy.type === 'hash') {
+                                lastStrategy.querySelector('.strategy-value').value = strategy.hashKey;
+                            } else if (strategy.type === 'whitelist' || strategy.type === 'blacklist') {
+                                lastStrategy.querySelector('.strategy-value').value = strategy.values.join(', ');
+                            } else if (strategy.type === 'dimension') {
+                                lastStrategy.querySelector('.strategy-dimension').value = strategy.dimension;
+                                lastStrategy.querySelector('.strategy-value').value = strategy.values.join(', ');
+                            }
+                        });
+                    } else {
+                        document.getElementById('strategyType').value = 'simple';
+                        updateStrategyForm();
+                        
+                        const rulesContainer = document.getElementById('rulesContainer');
+                        rulesContainer.innerHTML = '';
+                        ruleCounter = 0;
+                        
+                        if (release.rules && release.rules.length > 0) {
+                            release.rules.forEach(rule => {
+                                addRule();
+                                const lastRule = rulesContainer.lastElementChild;
+                                lastRule.querySelector('.rule-dimension').value = rule.dimension;
+                                lastRule.querySelector('.rule-values').value = rule.values.join(', ');
+                            });
+                        } else {
+                            addRule();
+                        }
+                    }
                     
                     document.getElementById('grayModal').classList.add('active');
                 }
