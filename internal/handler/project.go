@@ -19,7 +19,7 @@ func NewProjectHandler(service *service.ProjectService) *ProjectHandler {
 func (h *ProjectHandler) List(c *gin.Context) {
 	projects := h.service.List()
 	c.JSON(http.StatusOK, model.Response{
-		Code:    0,
+		Code:    200,
 		Message: "success",
 		Data:    projects,
 	})
@@ -37,14 +37,14 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 
 	if err := h.service.Create(&project); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
-			Code:    1,
+			Code:    500,
 			Message: err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    0,
+		Code:    200,
 		Message: "success",
 		Data:    project,
 	})
@@ -55,7 +55,7 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	var project model.Project
 	if err := c.ShouldBindJSON(&project); err != nil {
 		c.JSON(http.StatusBadRequest, model.Response{
-			Code:    1,
+			Code:    400,
 			Message: err.Error(),
 		})
 		return
@@ -63,14 +63,14 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 
 	if err := h.service.Update(id, &project); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
-			Code:    1,
+			Code:    500,
 			Message: err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    0,
+		Code:    200,
 		Message: "success",
 	})
 }
@@ -79,14 +79,14 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	id := c.Param("id")
 	if err := h.service.Delete(id); err != nil {
 		c.JSON(http.StatusInternalServerError, model.Response{
-			Code:    1,
+			Code:    500,
 			Message: err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, model.Response{
-		Code:    0,
+		Code:    200,
 		Message: "success",
 	})
 }
