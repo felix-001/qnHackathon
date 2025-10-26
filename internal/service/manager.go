@@ -61,3 +61,7 @@ func (m *Manager) Build() *BuildInfo {
 		TarFileName: buildResult.TarFileName,
 	}
 }
+
+func (m *Manager) ListBins() []string {
+	return []string{"stremad"}
+}
