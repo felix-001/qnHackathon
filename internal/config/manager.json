@@ -7,7 +7,7 @@
 	},
 	"gitlabConf": {
 		"url": "http://101.133.131.188:30811",
-		"privateToken": "zq_z86jKq18papzyqNF-",
+		"privateToken": "123abc-",
 		"projectID": "root/streamd"
 	},
 	"mongoConf": {
