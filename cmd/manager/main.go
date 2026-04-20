@@ -67,6 +67,7 @@ func main() {
 	configHandler.SetGitLabMgr(gitlabMgr)
 	grayReleaseHandler := handler.NewGrayReleaseHandler(grayReleaseService)
 	webHandler := handler.NewWebHandler()
+	managerHandler := handler.NewManagerHandler(mgr)
 
 	r.GET("/", webHandler.Index)
 	r.GET("/projects", webHandler.Projects)
@@ -121,6 +122,8 @@ func main() {
 		api.POST("/bins/:bin_name", binHandler.PostBin)
 		api.POST("/bins/:bin_name/progress", binHandler.PostProgress)
 		api.GET("/download/:bin_file_name", binHandler.Download)
+
+		api.GET("/manager/bins", managerHandler.ListBins)
 	}
 
 	r.GET("/health", binHandler.Health)
